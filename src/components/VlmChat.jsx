@@ -1,6 +1,6 @@
 import React, {useState} from 'react';
 
-export default function VlmChat({bridge, vlmClient, sdClient}) {
+export default function VlmChat({bridge, vlmClient, sdClient, captureFrame}) {
   const [text, setText] = useState('');
   const [messages, setMessages] = useState([
     {role: 'assistant', text: '你好，我是无人机小助手。只有点击「看画面」或运行图像理解积木时，我才会读取图传。'}
@@ -20,13 +20,17 @@ export default function VlmChat({bridge, vlmClient, sdClient}) {
   const askVision = async () => {
     const question = text.trim() || '请帮我看一下当前画面';
     addMessage({role: 'user', text: `看画面：${question}`});
-    addMessage({role: 'assistant', text: await vlmClient.describeFrame(question, bridge.getFrameMeta())});
+    const imageBase64 = captureFrame ? captureFrame() : null;
+    addMessage({
+      role: 'assistant',
+      text: await vlmClient.describeFrame(question, bridge.getFrameMeta(), imageBase64)
+    });
   };
 
   const createImage = async () => {
     const prompt = text.trim() || '儿童画风的无人机飞过操场';
     addMessage({role: 'user', text: `创建图片：${prompt}`});
-    addMessage({role: 'assistant', text: `SD mock 已生成：${prompt}`, image: await sdClient.createImage(prompt)});
+    addMessage({role: 'assistant', text: `已生成图片：${prompt}`, image: await sdClient.createImage(prompt)});
   };
 
   return (

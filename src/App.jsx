@@ -9,7 +9,10 @@ import ScratchBlocksEditor from './components/ScratchBlocksEditor.jsx';
 export default function App() {
   const [moduleName, setModuleName] = useState('阶梯式飞行');
   const blocksEditorRef = useRef(null);
+  const droneStageRef = useRef(null);
   const services = useMemo(() => ({droneBridge, vlmClient, sdClient}), []);
+
+  const captureFrame = () => droneStageRef.current?.captureFrame();
 
   const addLog = text => {
     console.info(text);
@@ -66,11 +69,12 @@ export default function App() {
         </section>
 
         <aside className="right-panel">
-          <DroneStage bridge={droneBridge} />
+          <DroneStage ref={droneStageRef} bridge={droneBridge} />
           <VlmChat
             bridge={droneBridge}
             vlmClient={vlmClient}
             sdClient={sdClient}
+            captureFrame={captureFrame}
           />
         </aside>
       </main>

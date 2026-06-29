@@ -1,10 +1,18 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useImperativeHandle, useRef, useState} from 'react';
 
-export default function DroneStage({bridge}) {
+const DroneStage = React.forwardRef(function DroneStage({bridge}, ref) {
   const canvasRef = useRef(null);
   const [drone, setDrone] = useState(bridge.getState());
 
   useEffect(() => bridge.subscribe(setDrone), [bridge]);
+
+  useImperativeHandle(ref, () => ({
+    captureFrame() {
+      const canvas = canvasRef.current;
+      if (!canvas) return null;
+      return canvas.toDataURL('image/png');
+    }
+  }));
 
   useEffect(() => {
     let frame;
@@ -67,4 +75,6 @@ export default function DroneStage({bridge}) {
       </div>
     </section>
   );
-}
+});
+
+export default DroneStage;
