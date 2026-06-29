@@ -1,0 +1,23 @@
+{
+  "name": "mixly-drone-scratch-gui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Drone visual-programming prototype migrated toward Scratch GUI and Scratch VM extension architecture.",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "check:extension": "node scripts/check-extension.mjs"
+  },
+  "dependencies": {
+    "@scratch/scratch-gui": "^14.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "scratch-vm": "^5.0.300"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.0",
+    "vite": "^7.0.0"
+  }
+}
