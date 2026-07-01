@@ -14,6 +14,17 @@ WORKSPACE_DIR = os.path.abspath(os.path.join(SERVER_DIR, "..", ".."))
 SD_DIR = os.environ.get("TONGFLY_SD_DIR", os.path.join(WORKSPACE_DIR, "SD"))
 
 
+def get_npu_core_mask():
+    env_value = os.environ.get("TONGFLY_NPU_CORE_MASK")
+    if env_value:
+        return int(env_value, 0)
+
+    for name in ("NPU_CORE_1_2", "NPU_CORE_0_1", "NPU_CORE_0"):
+        if hasattr(RKNNLite, name):
+            return getattr(RKNNLite, name)
+    return None
+
+
 def resolve_model_path(env_name, candidates, pattern):
     env_path = os.environ.get(env_name)
     if env_path:
@@ -31,7 +42,11 @@ class RKNNModel:
     def __init__(self, path):
         self.rknn = RKNNLite()
         self.rknn.load_rknn(path)
-        self.rknn.init_runtime(core_mask=RKNNLite.NPU_CORE_1_2)
+        core_mask = get_npu_core_mask()
+        if core_mask is None:
+            self.rknn.init_runtime()
+        else:
+            self.rknn.init_runtime(core_mask=core_mask)
 
     def __call__(self, x):
         return self.rknn.inference([x])

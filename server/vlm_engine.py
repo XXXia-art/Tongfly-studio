@@ -29,11 +29,26 @@ RKLLM_LIB_CANDIDATES = [
 RKLLM_LIB = next((path for path in RKLLM_LIB_CANDIDATES if path and os.path.exists(path)), RKLLM_LIB_CANDIDATES[1])
 
 
+def get_npu_core_mask():
+    env_value = os.environ.get("TONGFLY_NPU_CORE_MASK")
+    if env_value:
+        return int(env_value, 0)
+
+    for name in ("NPU_CORE_1_2", "NPU_CORE_0_1", "NPU_CORE_0"):
+        if hasattr(RKNNLite, name):
+            return getattr(RKNNLite, name)
+    return None
+
+
 class VisionEncoder:
     def __init__(self, path):
         self.rknn = RKNNLite()
         self.rknn.load_rknn(path)
-        self.rknn.init_runtime(core_mask=RKNNLite.NPU_CORE_1_2)
+        core_mask = get_npu_core_mask()
+        if core_mask is None:
+            self.rknn.init_runtime()
+        else:
+            self.rknn.init_runtime(core_mask=core_mask)
 
     def encode(self, img):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
