@@ -1,256 +1,120 @@
-import argparse
 import base64
-import io
-import json
+import ctypes
 import logging
-import os
-import time
 import threading
-
+import os
 import numpy as np
-import torch
-from PIL import Image
-from diffusers.schedulers import LCMScheduler
-from transformers import CLIPTokenizer
+import cv2
 from rknnlite.api import RKNNLite
 
-logging.basicConfig()
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+
+VISION_MODEL = os.path.join(os.path.dirname(__file__), "vision.rknn")
+LLM_MODEL = os.path.join(os.path.dirname(__file__), "model.rkllm")
+RKLLM_LIB = "/home/elf/librkllmrt.so"
 
 
-# ============================================================
-# RKNN MODEL WRAPPER
-# ============================================================
-class RKNN2Model:
-    def __init__(self, model_dir, data_format="nchw"):
-        self.data_format = data_format.lower()
-
-        config_path = os.path.join(model_dir, "config.json")
-        rknn_path = os.path.join(model_dir, "model.rknn")
-
-        self.config = json.load(open(config_path)) if os.path.exists(config_path) else {}
-
+class VisionEncoder:
+    def __init__(self, path):
         self.rknn = RKNNLite()
-        self.rknn.load_rknn(rknn_path)
-        self.rknn.init_runtime(core_mask=RKNNLite.NPU_CORE_0_1_2)
+        self.rknn.load_rknn(path)
+        self.rknn.init_runtime(core_mask=RKNNLite.NPU_CORE_1_2)
 
-        logger.info(f"Loaded RKNN: {model_dir}")
-
-    def __call__(self, **kwargs):
-        def prep(x):
-            if isinstance(x, np.ndarray):
-                if x.dtype != np.float32:
-                    x = x.astype(np.float32)
-
-                if x.ndim == 4:
-                    if self.data_format == "nhwc" and x.shape[1] in (1, 3, 4):
-                        x = x.transpose(0, 2, 3, 1)
-                    elif self.data_format == "nchw" and x.shape[-1] in (1, 3, 4):
-                        x = x.transpose(0, 3, 1, 2)
-
-                x = np.ascontiguousarray(x)
-            return x
-
-        inputs = [prep(v) for v in kwargs.values()]
-        return self.rknn.inference(inputs=inputs, data_format=self.data_format)
+    def encode(self, img):
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = cv2.resize(img, (392, 392))
+        img = np.expand_dims(img.astype(np.float32) / 255.0, 0)
+        return self.rknn.inference([img])[0].flatten()
 
     def release(self):
         self.rknn.release()
 
 
-# ============================================================
-# RK3588 SD PIPELINE (LCM)
-# ============================================================
-class RKNN2LatentConsistencyPipeline:
-    def __init__(self, text_encoder, unet, vae_decoder, scheduler, tokenizer):
-        self.text_encoder = text_encoder
-        self.unet = unet
-        self.vae = vae_decoder
-        self.scheduler = scheduler
-        self.tokenizer = tokenizer
-        self.vae_scale_factor = 8
+class LLMEngine:
+    def __init__(self, model_path):
+        self.lock = threading.Lock()
+        self.lib = ctypes.CDLL(RKLLM_LIB)
+        self.handle = ctypes.c_void_p()
 
-    # ---------------- prompt ----------------
-    def encode_prompt(self, prompt):
-        inputs = self.tokenizer(
-            prompt,
-            padding="max_length",
-            max_length=self.tokenizer.model_max_length,
-            return_tensors="np",
-        )
-        return self.text_encoder(input_ids=inputs.input_ids.astype(np.int32))[0]
+        self._text = []
+        self._done = False
 
-    # ---------------- latents ----------------
-    def prepare_latents(self, batch, ch, h, w, dtype, gen):
-        shape = (batch, ch, h // self.vae_scale_factor, w // self.vae_scale_factor)
+        def cb(result, ud, state):
+            if state == 2:
+                self._done = True
+            elif state == 0 and result:
+                try:
+                    self._text.append(result.contents.text.decode())
+                except:
+                    pass
 
-        if isinstance(gen, np.random.RandomState):
-            latents = gen.randn(*shape).astype(dtype)
-        else:
-            latents = np.random.randn(*shape).astype(dtype)
+        self.callback = ctypes.CFUNCTYPE(None, ctypes.POINTER(ctypes.c_void_p), ctypes.c_void_p, ctypes.c_int)(cb)
 
-        return latents * self.scheduler.init_noise_sigma
+        class Param(ctypes.Structure):
+            _fields_ = [
+                ("model_path", ctypes.c_char_p),
+                ("max_context_len", ctypes.c_int),
+                ("max_new_tokens", ctypes.c_int),
+                ("top_k", ctypes.c_int),
+                ("top_p", ctypes.c_float),
+                ("temperature", ctypes.c_float),
+                ("repeat_penalty", ctypes.c_float),
+                ("frequency_penalty", ctypes.c_float),
+                ("presence_penalty", ctypes.c_float),
+                ("mirostat", ctypes.c_int),
+                ("mirostat_tau", ctypes.c_float),
+                ("mirostat_eta", ctypes.c_float),
+                ("skip_special_token", ctypes.c_bool),
+                ("is_async", ctypes.c_bool),
+                ("img_start", ctypes.c_char_p),
+                ("img_end", ctypes.c_char_p),
+                ("img_content", ctypes.c_char_p),
+            ]
 
-    # ---------------- decode ----------------
-    def decode(self, latents):
-        latents = latents / self.vae.config.get("scaling_factor", 0.18215)
+        self.param = Param()
+        self.param.model_path = model_path.encode()
+        self.param.max_context_len = 512
+        self.param.max_new_tokens = 512
+        self.param.top_k = 1
+        self.param.top_p = 0.95
+        self.param.temperature = 0.7
 
-        outs = [
-            self.vae(latent_sample=latents[i:i+1])[0]
-            for i in range(latents.shape[0])
-        ]
-        return np.concatenate(outs, axis=0)
+        self.lib.rkllm_init(ctypes.byref(self.handle), ctypes.byref(self.param), self.callback)
+        self.fn_run = self.lib.rkllm_run
+        self.fn_destroy = self.lib.rkllm_destroy
 
-    # ---------------- main ----------------
-    def __call__(self, prompt, height, width, num_inference_steps, guidance_scale, generator):
-        batch = 1 if isinstance(prompt, str) else len(prompt)
+    def chat(self, text):
+        with self.lock:
+            self._text = []
+            self._done = False
+            inp = ctypes.c_char_p(text.encode())
+            self.fn_run(self.handle, inp, None)
 
-        prompt_embeds = self.encode_prompt(prompt)
+            while not self._done:
+                pass
 
-        self.scheduler.set_timesteps(num_inference_steps)
-        timesteps = self.scheduler.timesteps
+            return "".join(self._text)
 
-        latents = self.prepare_latents(
-            batch,
-            self.unet.config.get("in_channels", 4),
-            height,
-            width,
-            prompt_embeds.dtype,
-            generator,
-        )
-
-        w = np.full((batch,), guidance_scale - 1, dtype=prompt_embeds.dtype)
-        w_emb = self._guidance_embedding(w, dtype=prompt_embeds.dtype)
-
-        for t in timesteps:
-            timestep = np.array([t], dtype=np.int64)
-
-            noise_pred = self.unet(
-                sample=latents,
-                timestep=timestep,
-                encoder_hidden_states=prompt_embeds,
-                timestep_cond=w_emb,
-            )[0]
-
-            latents, denoised = self.scheduler.step(
-                torch.from_numpy(noise_pred),
-                t,
-                torch.from_numpy(latents),
-                return_dict=False,
-            )
-
-            latents = latents.numpy()
-            denoised = denoised.numpy()
-
-        image = self.decode(denoised)
-
-        image = image.transpose(0, 2, 3, 1)
-        image = image / 2 + 0.5
-        image = np.clip(image, 0, 1)
-
-        return {"images": self.to_pil(image)}
-
-    @staticmethod
-    def to_pil(image):
-        image = (image * 255).astype(np.uint8)
-        return [Image.fromarray(image[0])]
-
-    @staticmethod
-    def _guidance_embedding(w, embedding_dim=512, dtype=np.float32):
-        w = w * 1000
-        half = embedding_dim // 2
-        emb = np.log(10000.0) / (half - 1)
-        emb = np.exp(np.arange(half, dtype=dtype) * -emb)
-        emb = w[:, None] * emb[None, :]
-        emb = np.concatenate([np.sin(emb), np.cos(emb)], axis=1)
-        return emb
+    def release(self):
+        self.fn_destroy(self.handle)
 
 
-# ============================================================
-# SD ENGINE (same style as your VLMEngine)
-# ============================================================
-class SDEngine:
+class VLMEngine:
     def __init__(self):
-        self.pipe = None
+        self.vision = None
+        self.llm = None
         self.lock = threading.Lock()
 
-    def load(self, model_path, tokenizer_path):
-        logger.info("Loading RK3588 SD Engine...")
+    def load(self):
+        if self.vision:
+            return
+        self.vision = VisionEncoder(VISION_MODEL)
+        self.llm = LLMEngine(LLM_MODEL)
 
-        scheduler = LCMScheduler.from_config(
-            json.load(open(os.path.join(model_path, "scheduler/scheduler_config.json")))
-        )
-
-        tokenizer = CLIPTokenizer.from_pretrained(tokenizer_path)
-
-        self.pipe = RKNN2LatentConsistencyPipeline(
-            text_encoder=RKNN2Model(os.path.join(model_path, "text_encoder"), "nchw"),
-            unet=RKNN2Model(os.path.join(model_path, "unet"), "nhwc"),
-            vae_decoder=RKNN2Model(os.path.join(model_path, "vae_decoder"), "nhwc"),
-            scheduler=scheduler,
-            tokenizer=tokenizer,
-        )
-
-    def generate(self, model_path, tokenizer_path, prompt, size, steps, guidance):
-        self.load(model_path, tokenizer_path)
-
-        h, w = map(int, size.split("x"))
-
+    def chat(self, text):
+        self.load()
         with self.lock:
-            result = self.pipe(
-                prompt=prompt,
-                height=h,
-                width=w,
-                num_inference_steps=steps,
-                guidance_scale=guidance,
-                generator=np.random.RandomState(),
-            )
-
-        img = result["images"][0]
-
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-
-        return base64.b64encode(buf.getvalue()).decode()
+            return self.llm.chat(text)
 
 
-# ============================================================
-# CLI (same style as your VLM entry)
-# ============================================================
-def main():
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument("--prompt", required=True)
-    parser.add_argument("-i", required=True)
-    parser.add_argument("-o", required=True)
-    parser.add_argument("--tokenizer", required=True)
-
-    parser.add_argument("--size", default="512x512")
-    parser.add_argument("--steps", type=int, default=4)
-    parser.add_argument("--guidance", type=float, default=7.5)
-
-    args = parser.parse_args()
-
-    engine = SDEngine()
-
-    img_b64 = engine.generate(
-        args.i,
-        args.tokenizer,
-        args.prompt,
-        args.size,
-        args.steps,
-        args.guidance,
-    )
-
-    os.makedirs(args.o, exist_ok=True)
-    out_path = os.path.join(args.o, "out.png")
-
-    with open(out_path, "wb") as f:
-        f.write(base64.b64decode(img_b64))
-
-    print("saved:", out_path)
-
-
-if __name__ == "__main__":
-    main()
+vlm_engine = VLMEngine()
