@@ -116,5 +116,14 @@ class VLMEngine:
         with self.lock:
             return self.llm.chat(text)
 
+    def release(self):
+        with self.lock:
+            if self.vision:
+                self.vision.release()
+                self.vision = None
+            if self.llm:
+                self.llm.release()
+                self.llm = None
+
 
 vlm_engine = VLMEngine()

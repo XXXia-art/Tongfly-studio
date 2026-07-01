@@ -17,11 +17,17 @@ class RKNNModel:
     def __call__(self, x):
         return self.rknn.inference([x])
 
+    def release(self):
+        self.rknn.release()
+
 
 class SDEngine:
     def __init__(self):
         self.pipe = None
         self.lock = threading.Lock()
+        self.unet = None
+        self.vae = None
+        self.text = None
 
     def load(self):
         if self.pipe:
@@ -32,6 +38,7 @@ class SDEngine:
         self.unet = RKNNModel(os.path.join(base, "unet.rknn"))
         self.vae = RKNNModel(os.path.join(base, "vae.rknn"))
         self.text = RKNNModel(os.path.join(base, "text.rknn"))
+        self.pipe = True
 
     def generate(self, prompt, width, height, steps, guidance):
         self.load()
@@ -53,6 +60,16 @@ class SDEngine:
             im.save(buf, format="PNG")
 
             return base64.b64encode(buf.getvalue()).decode()
+
+    def release(self):
+        with self.lock:
+            for model in (self.unet, self.vae, self.text):
+                if model:
+                    model.release()
+            self.unet = None
+            self.vae = None
+            self.text = None
+            self.pipe = None
 
 
 sd_engine = SDEngine()

@@ -14,15 +14,15 @@ echo $! > server.pid
 
 echo "Server PID: $(cat server.pid)"
 echo "Log file: $LOG_FILE"
-echo "Waiting for health check (models load on first request) …"
+echo "Waiting for health check (VLM preloads on startup; SD loads on first request) …"
 
-for i in {1..10}; do
-  if curl -s http://localhost:8000/health >/dev/null 2>&1; then
+for i in {1..60}; do
+  if curl -s http://localhost:8000/health | grep -q '"vlm":true'; then
     echo "Server is ready: http://$(hostname -I | awk '{print $1}'):8000"
     exit 0
   fi
-  sleep 1
+  sleep 2
 done
 
-echo "Server did not become ready . Check $LOG_FILE"
+echo "Server did not preload VLM in time. Check $LOG_FILE"
 exit 1

@@ -3,6 +3,7 @@ dist/
 *.log
 vite-dev.pid
 scratch-drone-preview.png
+.env.local
 
 # Python inference server
 server/__pycache__/

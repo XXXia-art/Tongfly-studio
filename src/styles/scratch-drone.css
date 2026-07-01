@@ -637,6 +637,12 @@ button {
   border-color: #3373cc;
 }
 
+.message.error {
+  color: #8a2d1d;
+  background: #ffe8e2;
+  border-color: #f4b09f;
+}
+
 .message img {
   display: block;
   max-width: 220px;
@@ -644,28 +650,149 @@ button {
   border-radius: 8px;
 }
 
+.message-skill {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #2f6fe5;
+  background: #e7f0ff;
+  font-size: 12px;
+}
+
+.thinking-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.thinking-dots em {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.35;
+  animation: thinking-dot 1s ease-in-out infinite;
+}
+
+.thinking-dots em:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.thinking-dots em:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes thinking-dot {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.3;
+  }
+
+  40% {
+    transform: translateY(-4px);
+    opacity: 0.9;
+  }
+}
+
 .chat-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
-  gap: 8px;
   padding: 12px;
   border-top: 1px solid var(--line);
   background: #f5eddc;
 }
 
-.chat-form input {
-  min-width: 0;
-  height: 38px;
-  padding: 0 10px;
+.chat-composer {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 999px;
+  background: #fffdf7;
+  box-shadow: 0 2px 8px rgba(34, 49, 63, 0.08);
 }
 
-.chat-form button {
-  height: 38px;
-  padding: 0 12px;
-  border-radius: 8px;
+.chat-composer input {
+  min-width: 0;
+  flex: 1;
+  height: 34px;
+  padding: 0 4px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+}
+
+.chat-composer button {
+  flex: 0 0 auto;
+}
+
+.skill-toggle,
+.send-button {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 24px;
+  line-height: 1;
+  color: #162533;
+  background: transparent;
+}
+
+.skill-toggle.active {
+  color: #2f6fe5;
+  background: #e7f0ff;
+}
+
+.skill-chip {
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 0 10px;
+  border-radius: 999px;
+  color: #2f6fe5;
+  background: #e7f0ff;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.skill-chip button {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #2f6fe5;
+  background: rgba(47, 111, 229, 0.12);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.vision-button {
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 999px;
   color: #fff;
   background: #0f8c73;
   font-weight: 800;
+}
+
+.send-button {
+  color: #fff;
+  background: #111;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.chat-composer button:disabled,
+.chat-composer input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
