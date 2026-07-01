@@ -2,11 +2,10 @@ fastapi
 uvicorn
 python-multipart
 torch>=2.0
-torchvision
 transformers>=4.45.0,<5.0
-accelerate
-safetensors
 huggingface-hub
-qwen-vl-utils
 diffusers
 pillow
+opencv-python
+numpy
+rknn-toolkit-lite2

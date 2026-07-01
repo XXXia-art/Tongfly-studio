@@ -55,7 +55,7 @@ app.add_middleware(
 def health():
     return {
         "status": "ok",
-        "vlm_ready": vlm_engine.model is not None,
+        "vlm_ready": vlm_engine.vision is not None and vlm_engine.llm is not None,
         "sd_ready": sd_engine.pipe is not None,
     }
 

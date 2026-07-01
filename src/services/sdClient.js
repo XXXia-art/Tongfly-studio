@@ -17,10 +17,10 @@ class SDClient {
   async createImage(prompt) {
     const data = await postJson('/api/sd/generate', {
       prompt,
-      width: 512,
-      height: 512,
-      num_inference_steps: 25,
-      guidance_scale: 7.5
+      width: 256,
+      height: 256,
+      num_inference_steps: 4,
+      guidance_scale: 8.5
     });
     return `data:image/png;base64,${data.image_base64}`;
   }

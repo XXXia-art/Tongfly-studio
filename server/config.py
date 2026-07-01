@@ -1,38 +1,50 @@
 import os
 from pathlib import Path
 
+# ============================================================
+# VLM (Qwen2-VL 2B) — Vision via rknnlite, LLM via ctypes+librkllmrt.so
+# ============================================================
+QWEN2VL_DIR = Path(os.getenv("QWEN2VL_DIR", "/home/elf/QWEN2-VL"))
+VLM_VISION_MODEL = os.getenv(
+    "VLM_VISION_MODEL",
+    str(QWEN2VL_DIR / "qwen2_vl_2b_vision_rk3588.rknn"),
+)
+VLM_LLM_MODEL = os.getenv(
+    "VLM_LLM_MODEL",
+    str(QWEN2VL_DIR / "Qwen2-VL-2B-Instruct.rkllm"),
+)
+RKLLM_LIB = os.getenv("RKLLM_LIB", "/home/elf/librkllmrt.so")
 
-def _find_model_weight_dir():
-    """Search upward from this file for a directory named model-weight that
-    contains both VLM and SD subdirectories."""
-    start = Path(__file__).resolve().parent
-    for parent in [start, *start.parents]:
-        candidate = parent / "model-weight"
-        if (candidate / "VLM").exists() and (candidate / "SD").exists():
-            return candidate
-    # Fallback: one level above server/ (legacy layout when server lived next to model-weight)
-    return start.parent / "model-weight"
+# VLM generation params
+VLM_MAX_NEW_TOKENS = int(os.getenv("VLM_MAX_NEW_TOKENS", "256"))
+VLM_MAX_CONTEXT_LEN = int(os.getenv("VLM_MAX_CONTEXT_LEN", "512"))
 
-
-MODEL_WEIGHT_DIR = Path(os.getenv("MODEL_WEIGHT_DIR", str(_find_model_weight_dir())))
-
-VLM_MODEL_PATH = os.getenv("VLM_MODEL_PATH", str(MODEL_WEIGHT_DIR / "VLM"))
-SD_MODEL_PATH = os.getenv(
-    "SD_MODEL_PATH", str(MODEL_WEIGHT_DIR / "SD" / "v1-5-pruned-emaonly.safetensors")
+# ============================================================
+# SD (Stable Diffusion v1.5 LCM) — all three components via rknnlite
+# ============================================================
+SD_DIR = Path(os.getenv("SD_DIR", "/home/elf/SD"))
+SD_TEXT_ENCODER_DIR = os.getenv(
+    "SD_TEXT_ENCODER_DIR", str(SD_DIR / "text_encoder")
+)
+SD_UNET_DIR = os.getenv("SD_UNET_DIR", str(SD_DIR / "unet"))
+SD_VAE_DECODER_DIR = os.getenv(
+    "SD_VAE_DECODER_DIR", str(SD_DIR / "vae_decoder")
+)
+SD_SCHEDULER_CONFIG = os.getenv(
+    "SD_SCHEDULER_CONFIG", str(SD_DIR / "scheduler" / "scheduler_config.json")
+)
+SD_CLIP_TOKENIZER = os.getenv(
+    "SD_CLIP_TOKENIZER", str(SD_DIR / "clip_tokenizer")
 )
 
-VLM_DEVICE = os.getenv("VLM_DEVICE", "cuda:0")
-SD_DEVICE = os.getenv("SD_DEVICE", "cuda:1")
+# SD generation defaults (LCM: fewer steps, lower resolution)
+SD_DEFAULT_WIDTH = int(os.getenv("SD_DEFAULT_WIDTH", "256"))
+SD_DEFAULT_HEIGHT = int(os.getenv("SD_DEFAULT_HEIGHT", "256"))
+SD_DEFAULT_STEPS = int(os.getenv("SD_DEFAULT_STEPS", "4"))
+SD_DEFAULT_GUIDANCE_SCALE = float(os.getenv("SD_DEFAULT_GUIDANCE_SCALE", "8.5"))
 
+# ============================================================
+# Server
+# ============================================================
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8000"))
-
-# SD generation defaults
-SD_DEFAULT_WIDTH = int(os.getenv("SD_DEFAULT_WIDTH", "512"))
-SD_DEFAULT_HEIGHT = int(os.getenv("SD_DEFAULT_HEIGHT", "512"))
-SD_DEFAULT_STEPS = int(os.getenv("SD_DEFAULT_STEPS", "25"))
-SD_DEFAULT_GUIDANCE_SCALE = float(os.getenv("SD_DEFAULT_GUIDANCE_SCALE", "7.5"))
-
-# VLM generation defaults
-VLM_MAX_NEW_TOKENS = int(os.getenv("VLM_MAX_NEW_TOKENS", "256"))
-VLM_DO_SAMPLE = os.getenv("VLM_DO_SAMPLE", "true").lower() in ("1", "true", "yes")

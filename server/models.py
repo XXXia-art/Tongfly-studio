@@ -18,10 +18,10 @@ class VlmResponse(BaseModel):
 class SdGenerateRequest(BaseModel):
     prompt: str = Field(..., min_length=1, description="文生图提示词")
     negative_prompt: Optional[str] = Field("", description="负面提示词")
-    width: Optional[int] = Field(512, ge=256, le=1024)
-    height: Optional[int] = Field(512, ge=256, le=1024)
-    num_inference_steps: Optional[int] = Field(25, ge=1, le=100)
-    guidance_scale: Optional[float] = Field(7.5, ge=1.0, le=20.0)
+    width: Optional[int] = Field(256, ge=128, le=768)
+    height: Optional[int] = Field(256, ge=128, le=768)
+    num_inference_steps: Optional[int] = Field(4, ge=1, le=50)
+    guidance_scale: Optional[float] = Field(8.5, ge=1.0, le=20.0)
 
 
 class SdResponse(BaseModel):
