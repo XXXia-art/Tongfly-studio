@@ -9,9 +9,24 @@ from rknnlite.api import RKNNLite
 
 logger = logging.getLogger(__name__)
 
-VISION_MODEL = os.path.join(os.path.dirname(__file__), "vision.rknn")
-LLM_MODEL = os.path.join(os.path.dirname(__file__), "model.rkllm")
-RKLLM_LIB = "/home/elf/librkllmrt.so"
+SERVER_DIR = os.path.dirname(__file__)
+WORKSPACE_DIR = os.path.abspath(os.path.join(SERVER_DIR, "..", ".."))
+QWEN_DIR = os.environ.get("TONGFLY_QWEN_DIR", os.path.join(WORKSPACE_DIR, "QWEN2-VL"))
+
+VISION_MODEL = os.environ.get(
+    "TONGFLY_VISION_MODEL",
+    os.path.join(QWEN_DIR, "qwen2_vl_2b_vision_rk3588.rknn"),
+)
+LLM_MODEL = os.environ.get(
+    "TONGFLY_LLM_MODEL",
+    os.path.join(QWEN_DIR, "Qwen2-VL-2B-Instruct.rkllm"),
+)
+RKLLM_LIB_CANDIDATES = [
+    os.environ.get("TONGFLY_RKLLM_LIB"),
+    os.path.join(QWEN_DIR, "install", "demo_Linux_aarch64", "lib", "librkllmrt.so"),
+    "/home/elf/librkllmrt.so",
+]
+RKLLM_LIB = next((path for path in RKLLM_LIB_CANDIDATES if path and os.path.exists(path)), RKLLM_LIB_CANDIDATES[1])
 
 
 class VisionEncoder:

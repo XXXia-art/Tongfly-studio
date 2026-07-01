@@ -65,6 +65,8 @@ def health():
         "vlm_loading": vlm_engine.loading,
         "vlm_error": vlm_engine.last_error,
         "sd": sd_engine.pipe is not None,
+        "sd_loading": sd_engine.loading,
+        "sd_error": sd_engine.last_error,
     }
 
 
