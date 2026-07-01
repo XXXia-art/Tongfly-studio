@@ -104,12 +104,27 @@ class VLMEngine:
         self.vision = None
         self.llm = None
         self.lock = threading.Lock()
+        self.loading = False
+        self.last_error = None
 
     def load(self):
         if self.vision:
             return
-        self.vision = VisionEncoder(VISION_MODEL)
-        self.llm = LLMEngine(LLM_MODEL)
+        self.loading = True
+        self.last_error = None
+        try:
+            for path in (VISION_MODEL, LLM_MODEL, RKLLM_LIB):
+                if not os.path.exists(path):
+                    raise FileNotFoundError(f"Missing VLM dependency: {path}")
+            self.vision = VisionEncoder(VISION_MODEL)
+            self.llm = LLMEngine(LLM_MODEL)
+        except Exception as exc:
+            self.last_error = str(exc)
+            logger.exception("Failed to load VLM")
+            self.release()
+            raise
+        finally:
+            self.loading = False
 
     def chat(self, text):
         self.load()

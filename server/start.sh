@@ -17,7 +17,7 @@ echo "Log file: $LOG_FILE"
 echo "Waiting for health check (VLM preloads on startup; SD loads on first request) …"
 
 for i in {1..60}; do
-  if curl -s http://localhost:8000/health | grep -q '"vlm":true'; then
+  if curl -s http://localhost:8000/health | grep -Eq '"vlm"[[:space:]]*:[[:space:]]*true'; then
     echo "Server is ready: http://$(hostname -I | awk '{print $1}'):8000"
     exit 0
   fi
