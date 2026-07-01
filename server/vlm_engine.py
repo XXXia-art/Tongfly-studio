@@ -1,346 +1,256 @@
-"""
-Qwen2-VL 2B engine for RK3588.
-Vision encoder → rknnlite (NPU cores 1+2)
-LLM body → ctypes + librkllmrt.so (NPU)
-"""
-
+import argparse
 import base64
-import ctypes
 import io
+import json
 import logging
-import re
-import threading
+import os
 import time
-from typing import Optional
+import threading
 
-import cv2
 import numpy as np
+import torch
+from PIL import Image
+from diffusers.schedulers import LCMScheduler
+from transformers import CLIPTokenizer
 from rknnlite.api import RKNNLite
 
-from config import (
-    RKLLM_LIB,
-    VLM_MAX_CONTEXT_LEN,
-    VLM_MAX_NEW_TOKENS,
-    VLM_LLM_MODEL,
-    VLM_VISION_MODEL,
-)
-
+logging.basicConfig()
 logger = logging.getLogger(__name__)
-
-# ============================================================
-# Vision Encoder constants (must match C++ demo / model export)
-# ============================================================
-IMAGE_SIZE = 392
-N_IMAGE_TOKENS = 196
-IMAGE_EMBED_LEN = 1536
-
-# Qwen2-VL chat template
-PROMPT_PREFIX = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n"
-PROMPT_SUFFIX = "<|im_end|>\n<|im_start|>assistant\n"
-
-IMG_START = b"<|vision_start|>"
-IMG_END = b"<|vision_end|>"
-IMG_CONTENT = b"<|image_pad|>"
-
-# ============================================================
-# rkllm ctypes setup
-# ============================================================
-_rkllm_lib = ctypes.CDLL(RKLLM_LIB)
-
-RKLLM_RUN_NORMAL = 0
-RKLLM_RUN_FINISH = 2
-RKLLM_RUN_ERROR = 3
-
-RKLLM_INPUT_PROMPT = 0
-RKLLM_INPUT_MULTIMODAL = 3
-RKLLM_INFER_GENERATE = 0
-
-
-class RKLLMExtendParam(ctypes.Structure):
-    _fields_ = [
-        ("base_domain_id", ctypes.c_int32),
-        ("reserved", ctypes.c_uint8 * 112),
-    ]
-
-
-class RKLLMParam(ctypes.Structure):
-    _fields_ = [
-        ("model_path", ctypes.c_char_p),
-        ("max_context_len", ctypes.c_int32),
-        ("max_new_tokens", ctypes.c_int32),
-        ("top_k", ctypes.c_int32),
-        ("top_p", ctypes.c_float),
-        ("temperature", ctypes.c_float),
-        ("repeat_penalty", ctypes.c_float),
-        ("frequency_penalty", ctypes.c_float),
-        ("presence_penalty", ctypes.c_float),
-        ("mirostat", ctypes.c_int32),
-        ("mirostat_tau", ctypes.c_float),
-        ("mirostat_eta", ctypes.c_float),
-        ("skip_special_token", ctypes.c_bool),
-        ("is_async", ctypes.c_bool),
-        ("img_start", ctypes.c_char_p),
-        ("img_end", ctypes.c_char_p),
-        ("img_content", ctypes.c_char_p),
-        ("extend_param", RKLLMExtendParam),
-    ]
-
-
-class RKLLMMultiModelInput(ctypes.Structure):
-    _fields_ = [
-        ("prompt", ctypes.c_char_p),
-        ("image_embed", ctypes.POINTER(ctypes.c_float)),
-        ("n_image_tokens", ctypes.c_size_t),
-    ]
-
-
-class RKLLMInputUnion(ctypes.Union):
-    _fields_ = [
-        ("prompt_input", ctypes.c_char_p),
-        ("embed_input", ctypes.c_ubyte * 16),
-        ("token_input", ctypes.c_ubyte * 16),
-        ("multimodal_input", RKLLMMultiModelInput),
-    ]
-
-
-class RKLLMInput(ctypes.Structure):
-    _fields_ = [
-        ("input_type", ctypes.c_int),
-        ("input_data", RKLLMInputUnion),
-    ]
-
-
-class RKLLMInferParam(ctypes.Structure):
-    _fields_ = [
-        ("mode", ctypes.c_int),
-        ("lora_params", ctypes.c_void_p),
-        ("prompt_cache_params", ctypes.c_void_p),
-    ]
-
-
-class RKLLMResult(ctypes.Structure):
-    _fields_ = [
-        ("text", ctypes.c_char_p),
-        ("token_id", ctypes.c_int32),
-        ("last_hidden_layer", ctypes.c_void_p),
-    ]
+logger.setLevel(logging.INFO)
 
 
 # ============================================================
-# Vision Encoder (stateless, rknnlite)
+# RKNN MODEL WRAPPER
 # ============================================================
-class VisionEncoder:
-    def __init__(self, model_path: str):
+class RKNN2Model:
+    def __init__(self, model_dir, data_format="nchw"):
+        self.data_format = data_format.lower()
+
+        config_path = os.path.join(model_dir, "config.json")
+        rknn_path = os.path.join(model_dir, "model.rknn")
+
+        self.config = json.load(open(config_path)) if os.path.exists(config_path) else {}
+
         self.rknn = RKNNLite()
-        ret = self.rknn.load_rknn(model_path)
-        if ret != 0:
-            raise RuntimeError(f"Failed to load vision RKNN model: {model_path}")
-        # Use NPU core 1+2, leave core 0 for other tasks
-        ret = self.rknn.init_runtime(core_mask=0b011)
-        if ret != 0:
-            raise RuntimeError("Vision RKNN init_runtime failed")
-        logger.info("Vision encoder loaded (NPU core 1+2)")
+        self.rknn.load_rknn(rknn_path)
+        self.rknn.init_runtime(core_mask=RKNNLite.NPU_CORE_0_1_2)
 
-    def preprocess(self, img_bgr: np.ndarray) -> np.ndarray:
-        """BGR→RGB → expand2square(127.5) → resize 392 → NHWC → /255"""
-        img = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-        h, w = img.shape[:2]
-        size = max(w, h)
-        square = np.full((size, size, 3), 127.5, dtype=np.float32)
-        x_off = (size - w) // 2
-        y_off = (size - h) // 2
-        square[y_off : y_off + h, x_off : x_off + w] = img.astype(np.float32)
-        resized = cv2.resize(square, (IMAGE_SIZE, IMAGE_SIZE), interpolation=cv2.INTER_LINEAR)
-        return np.expand_dims(resized, axis=0)
+        logger.info(f"Loaded RKNN: {model_dir}")
 
-    def encode(self, img_bgr: np.ndarray) -> np.ndarray:
-        """Return image_embed (np.float32, shape: [196*1536])"""
-        blob = self.preprocess(img_bgr)
-        outputs = self.rknn.inference(inputs=[blob])
-        return outputs[0].astype(np.float32).flatten()
+    def __call__(self, **kwargs):
+        def prep(x):
+            if isinstance(x, np.ndarray):
+                if x.dtype != np.float32:
+                    x = x.astype(np.float32)
+
+                if x.ndim == 4:
+                    if self.data_format == "nhwc" and x.shape[1] in (1, 3, 4):
+                        x = x.transpose(0, 2, 3, 1)
+                    elif self.data_format == "nchw" and x.shape[-1] in (1, 3, 4):
+                        x = x.transpose(0, 3, 1, 2)
+
+                x = np.ascontiguousarray(x)
+            return x
+
+        inputs = [prep(v) for v in kwargs.values()]
+        return self.rknn.inference(inputs=inputs, data_format=self.data_format)
 
     def release(self):
         self.rknn.release()
 
 
 # ============================================================
-# LLM Engine (ctypes + librkllmrt.so, one instance with lock)
+# RK3588 SD PIPELINE (LCM)
 # ============================================================
-class LLMEngine:
-    def __init__(self, model_path: str):
-        self._text_parts: list = []
-        self._done: bool = False
-        self._req_lock = threading.Lock()
+class RKNN2LatentConsistencyPipeline:
+    def __init__(self, text_encoder, unet, vae_decoder, scheduler, tokenizer):
+        self.text_encoder = text_encoder
+        self.unet = unet
+        self.vae = vae_decoder
+        self.scheduler = scheduler
+        self.tokenizer = tokenizer
+        self.vae_scale_factor = 8
 
-        # Build callback that writes into this instance's state
-        engine_ref = self
+    # ---------------- prompt ----------------
+    def encode_prompt(self, prompt):
+        inputs = self.tokenizer(
+            prompt,
+            padding="max_length",
+            max_length=self.tokenizer.model_max_length,
+            return_tensors="np",
+        )
+        return self.text_encoder(input_ids=inputs.input_ids.astype(np.int32))[0]
 
-        @ctypes.CFUNCTYPE(None, ctypes.POINTER(RKLLMResult), ctypes.c_void_p, ctypes.c_int)
-        def _callback(result_ptr, _userdata, state):
-            if state == RKLLM_RUN_FINISH:
-                engine_ref._done = True
-            elif state == RKLLM_RUN_ERROR:
-                engine_ref._done = True
-            elif state == RKLLM_RUN_NORMAL:
-                if result_ptr and result_ptr.contents.text:
-                    try:
-                        text = result_ptr.contents.text.decode("utf-8", errors="replace")
-                    except Exception:
-                        text = result_ptr.contents.text.decode("utf-8", errors="ignore")
-                    engine_ref._text_parts.append(text)
+    # ---------------- latents ----------------
+    def prepare_latents(self, batch, ch, h, w, dtype, gen):
+        shape = (batch, ch, h // self.vae_scale_factor, w // self.vae_scale_factor)
 
-        self._callback = _callback  # prevent GC
+        if isinstance(gen, np.random.RandomState):
+            latents = gen.randn(*shape).astype(dtype)
+        else:
+            latents = np.random.randn(*shape).astype(dtype)
 
-        param = RKLLMParam()
-        param.model_path = model_path.encode("utf-8")
-        param.max_context_len = VLM_MAX_CONTEXT_LEN
-        param.max_new_tokens = VLM_MAX_NEW_TOKENS
-        param.top_k = 1
-        param.top_p = 0.95
-        param.temperature = 0.8
-        param.repeat_penalty = 1.1
-        param.frequency_penalty = 0.0
-        param.presence_penalty = 0.0
-        param.mirostat = 0
-        param.mirostat_tau = 5.0
-        param.mirostat_eta = 0.1
-        param.skip_special_token = False
-        param.is_async = False
-        param.img_start = IMG_START
-        param.img_end = IMG_END
-        param.img_content = IMG_CONTENT
-        param.extend_param.base_domain_id = 0
+        return latents * self.scheduler.init_noise_sigma
 
-        self.handle = ctypes.c_void_p()
+    # ---------------- decode ----------------
+    def decode(self, latents):
+        latents = latents / self.vae.config.get("scaling_factor", 0.18215)
 
-        fn_init = _rkllm_lib.rkllm_init
-        fn_init.argtypes = [
-            ctypes.POINTER(ctypes.c_void_p),
-            ctypes.POINTER(RKLLMParam),
-            ctypes.CFUNCTYPE(None, ctypes.POINTER(RKLLMResult), ctypes.c_void_p, ctypes.c_int),
+        outs = [
+            self.vae(latent_sample=latents[i:i+1])[0]
+            for i in range(latents.shape[0])
         ]
-        fn_init.restype = ctypes.c_int
-        ret = fn_init(ctypes.byref(self.handle), ctypes.byref(param), self._callback)
-        if ret != 0:
-            raise RuntimeError(f"rkllm_init failed, code: {ret}")
+        return np.concatenate(outs, axis=0)
 
-        self._fn_run = _rkllm_lib.rkllm_run
-        self._fn_run.argtypes = [
-            ctypes.c_void_p,
-            ctypes.POINTER(RKLLMInput),
-            ctypes.POINTER(RKLLMInferParam),
-            ctypes.c_void_p,
-        ]
-        self._fn_run.restype = ctypes.c_int
+    # ---------------- main ----------------
+    def __call__(self, prompt, height, width, num_inference_steps, guidance_scale, generator):
+        batch = 1 if isinstance(prompt, str) else len(prompt)
 
-        self._fn_destroy = _rkllm_lib.rkllm_destroy
-        self._fn_destroy.argtypes = [ctypes.c_void_p]
-        self._fn_destroy.restype = ctypes.c_int
+        prompt_embeds = self.encode_prompt(prompt)
 
-        logger.info("LLM engine initialised (rkllm)")
+        self.scheduler.set_timesteps(num_inference_steps)
+        timesteps = self.scheduler.timesteps
 
-    def _run(self, rkllm_input: RKLLMInput) -> str:
-        infer_param = RKLLMInferParam()
-        ctypes.memset(ctypes.byref(infer_param), 0, ctypes.sizeof(RKLLMInferParam))
-        infer_param.mode = RKLLM_INFER_GENERATE
+        latents = self.prepare_latents(
+            batch,
+            self.unet.config.get("in_channels", 4),
+            height,
+            width,
+            prompt_embeds.dtype,
+            generator,
+        )
 
-        def _runner():
-            self._fn_run(self.handle, ctypes.byref(rkllm_input), ctypes.byref(infer_param), None)
+        w = np.full((batch,), guidance_scale - 1, dtype=prompt_embeds.dtype)
+        w_emb = self._guidance_embedding(w, dtype=prompt_embeds.dtype)
 
-        t = threading.Thread(target=_runner, daemon=True)
-        t.start()
-        t.join()
+        for t in timesteps:
+            timestep = np.array([t], dtype=np.int64)
 
-        while not self._done:
-            time.sleep(0.01)
+            noise_pred = self.unet(
+                sample=latents,
+                timestep=timestep,
+                encoder_hidden_states=prompt_embeds,
+                timestep_cond=w_emb,
+            )[0]
 
-        return "".join(self._text_parts)
-
-    def _reset_state(self):
-        self._text_parts = []
-        self._done = False
-
-    def chat_text(self, prompt: str) -> str:
-        """纯文本对话"""
-        with self._req_lock:
-            self._reset_state()
-            full = f"{PROMPT_PREFIX}{prompt}{PROMPT_SUFFIX}"
-            inp = RKLLMInput()
-            inp.input_type = RKLLM_INPUT_PROMPT
-            inp.input_data.prompt_input = full.encode("utf-8")
-            return self._run(inp)
-
-    def chat_multimodal(self, prompt: str, image_embed: np.ndarray) -> str:
-        """多模态对话（图片 + 文本）"""
-        if image_embed.dtype != np.float32:
-            image_embed = image_embed.astype(np.float32)
-        with self._req_lock:
-            self._reset_state()
-            full = f"{PROMPT_PREFIX}{prompt}{PROMPT_SUFFIX}"
-            inp = RKLLMInput()
-            inp.input_type = RKLLM_INPUT_MULTIMODAL
-            inp.input_data.multimodal_input.prompt = full.encode("utf-8")
-            inp.input_data.multimodal_input.n_image_tokens = N_IMAGE_TOKENS
-            inp.input_data.multimodal_input.image_embed = image_embed.ctypes.data_as(
-                ctypes.POINTER(ctypes.c_float)
+            latents, denoised = self.scheduler.step(
+                torch.from_numpy(noise_pred),
+                t,
+                torch.from_numpy(latents),
+                return_dict=False,
             )
-            return self._run(inp)
 
-    def release(self):
-        self._fn_destroy(self.handle)
+            latents = latents.numpy()
+            denoised = denoised.numpy()
+
+        image = self.decode(denoised)
+
+        image = image.transpose(0, 2, 3, 1)
+        image = image / 2 + 0.5
+        image = np.clip(image, 0, 1)
+
+        return {"images": self.to_pil(image)}
+
+    @staticmethod
+    def to_pil(image):
+        image = (image * 255).astype(np.uint8)
+        return [Image.fromarray(image[0])]
+
+    @staticmethod
+    def _guidance_embedding(w, embedding_dim=512, dtype=np.float32):
+        w = w * 1000
+        half = embedding_dim // 2
+        emb = np.log(10000.0) / (half - 1)
+        emb = np.exp(np.arange(half, dtype=dtype) * -emb)
+        emb = w[:, None] * emb[None, :]
+        emb = np.concatenate([np.sin(emb), np.cos(emb)], axis=1)
+        return emb
 
 
 # ============================================================
-# Top-level VLM engine
+# SD ENGINE (same style as your VLMEngine)
 # ============================================================
-class VLMEngine:
+class SDEngine:
     def __init__(self):
-        self.vision: Optional[VisionEncoder] = None
-        self.llm: Optional[LLMEngine] = None
-        self._npui_lock = threading.Lock()
+        self.pipe = None
+        self.lock = threading.Lock()
 
-    def load(self):
-        if self.vision is not None:
-            return
-        logger.info("Loading VLM (Qwen2-VL 2B) …")
-        self.vision = VisionEncoder(VLM_VISION_MODEL)
-        self.llm = LLMEngine(VLM_LLM_MODEL)
-        logger.info("VLM ready")
+    def load(self, model_path, tokenizer_path):
+        logger.info("Loading RK3588 SD Engine...")
 
-    def _decode_image(self, image_base64: str) -> np.ndarray:
-        """Decode base64 image (PNG/JPEG) to BGR numpy array for vision encoder."""
-        data = re.sub(r"^data:image/[^;]+;base64,", "", image_base64)
-        raw = base64.b64decode(data)
-        img_array = np.frombuffer(raw, np.uint8)
-        img_bgr = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-        if img_bgr is None:
-            raise ValueError("Failed to decode image from base64")
-        return img_bgr
+        scheduler = LCMScheduler.from_config(
+            json.load(open(os.path.join(model_path, "scheduler/scheduler_config.json")))
+        )
 
-    def chat(self, text: str) -> str:
-        """纯文本对话（VLM 的文本模式）"""
-        self.load()
-        with self._npui_lock:
-            return self.llm.chat_text(text)
+        tokenizer = CLIPTokenizer.from_pretrained(tokenizer_path)
 
-    def describe(self, question: str, image_base64: Optional[str] = None) -> str:
-        """多模态描述：可选图片 + 问题"""
-        self.load()
-        with self._npui_lock:
-            if image_base64:
-                img_bgr = self._decode_image(image_base64)
-                embed = self.vision.encode(img_bgr)
-                prompt = f"<image>{question}"
-                return self.llm.chat_multimodal(prompt, embed)
-            else:
-                # 没有图片时用文本模式回答
-                return self.llm.chat_text(question)
+        self.pipe = RKNN2LatentConsistencyPipeline(
+            text_encoder=RKNN2Model(os.path.join(model_path, "text_encoder"), "nchw"),
+            unet=RKNN2Model(os.path.join(model_path, "unet"), "nhwc"),
+            vae_decoder=RKNN2Model(os.path.join(model_path, "vae_decoder"), "nhwc"),
+            scheduler=scheduler,
+            tokenizer=tokenizer,
+        )
 
-    def release(self):
-        if self.vision:
-            self.vision.release()
-        if self.llm:
-            self.llm.release()
+    def generate(self, model_path, tokenizer_path, prompt, size, steps, guidance):
+        self.load(model_path, tokenizer_path)
+
+        h, w = map(int, size.split("x"))
+
+        with self.lock:
+            result = self.pipe(
+                prompt=prompt,
+                height=h,
+                width=w,
+                num_inference_steps=steps,
+                guidance_scale=guidance,
+                generator=np.random.RandomState(),
+            )
+
+        img = result["images"][0]
+
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+
+        return base64.b64encode(buf.getvalue()).decode()
 
 
-vlm_engine = VLMEngine()
+# ============================================================
+# CLI (same style as your VLM entry)
+# ============================================================
+def main():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--prompt", required=True)
+    parser.add_argument("-i", required=True)
+    parser.add_argument("-o", required=True)
+    parser.add_argument("--tokenizer", required=True)
+
+    parser.add_argument("--size", default="512x512")
+    parser.add_argument("--steps", type=int, default=4)
+    parser.add_argument("--guidance", type=float, default=7.5)
+
+    args = parser.parse_args()
+
+    engine = SDEngine()
+
+    img_b64 = engine.generate(
+        args.i,
+        args.tokenizer,
+        args.prompt,
+        args.size,
+        args.steps,
+        args.guidance,
+    )
+
+    os.makedirs(args.o, exist_ok=True)
+    out_path = os.path.join(args.o, "out.png")
+
+    with open(out_path, "wb") as f:
+        f.write(base64.b64decode(img_b64))
+
+    print("saved:", out_path)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,210 +1,154 @@
-"""
-Stable Diffusion v1.5 LCM engine for RK3588.
-Text encoder / U-Net / VAE decoder all run on NPU via rknnlite.
-"""
-
+import argparse
 import base64
 import io
 import json
 import logging
 import os
-import threading
 import time
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 import numpy as np
 import torch
-from diffusers.pipelines.pipeline_utils import DiffusionPipeline
-from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
-from diffusers.schedulers import LCMScheduler
 from PIL import Image
-from rknnlite.api import RKNNLite
+from diffusers.schedulers import LCMScheduler
 from transformers import CLIPTokenizer
+from rknnlite.api import RKNNLite
 
-from config import (
-    SD_CLIP_TOKENIZER,
-    SD_DEFAULT_GUIDANCE_SCALE,
-    SD_DEFAULT_HEIGHT,
-    SD_DEFAULT_STEPS,
-    SD_DEFAULT_WIDTH,
-    SD_SCHEDULER_CONFIG,
-    SD_TEXT_ENCODER_DIR,
-    SD_UNET_DIR,
-    SD_VAE_DECODER_DIR,
-)
-
+logging.basicConfig()
 logger = logging.getLogger(__name__)
-
-VAE_SCALE_FACTOR = 8
+logger.setLevel(logging.INFO)
 
 
 # ============================================================
-# Thin rknnlite wrapper (adapted from run_rknn-lcm.py)
+# RKNN wrapper
 # ============================================================
 class RKNN2Model:
-    def __init__(self, model_dir: str, data_format: str = "nchw"):
-        logger.info(f"Loading RKNN model {model_dir}")
+    def __init__(self, model_dir, data_format="nchw"):
         self.data_format = data_format.lower()
+
         config_path = os.path.join(model_dir, "config.json")
         rknn_path = os.path.join(model_dir, "model.rknn")
-        if not os.path.exists(rknn_path):
-            raise FileNotFoundError(f"RKNN model not found: {rknn_path}")
-        self.config = json.load(open(config_path)) if os.path.exists(config_path) else {}
-        self.rknnlite = RKNNLite()
-        self.rknnlite.load_rknn(rknn_path)
-        self.rknnlite.init_runtime(core_mask=RKNNLite.NPU_CORE_0_1_2)
-        self.modelname = model_dir.rstrip("/").split("/")[-1]
-        logger.info(f"  {self.modelname} loaded")
 
-    def __call__(self, **kwargs) -> List[np.ndarray]:
-        def _prep(x):
+        self.config = json.load(open(config_path)) if os.path.exists(config_path) else {}
+
+        self.rknn = RKNNLite()
+        self.rknn.load_rknn(rknn_path)
+        self.rknn.init_runtime(core_mask=RKNNLite.NPU_CORE_0_1_2)
+
+        logger.info(f"Loaded RKNN model: {model_dir}")
+
+    def __call__(self, **kwargs):
+        def prep(x):
             if isinstance(x, np.ndarray):
-                if x.dtype in (np.float16, np.float64):
-                    x = x.astype(np.float32, copy=False)
+                if x.dtype != np.float32:
+                    x = x.astype(np.float32)
+
                 if x.ndim == 4:
                     if self.data_format == "nhwc" and x.shape[1] in (1, 3, 4):
                         x = x.transpose(0, 2, 3, 1)
                     elif self.data_format == "nchw" and x.shape[-1] in (1, 3, 4):
                         x = x.transpose(0, 3, 1, 2)
+
                 x = np.ascontiguousarray(x)
             return x
 
-        inputs = [_prep(v) for v in kwargs.values()]
-        return self.rknnlite.inference(inputs=inputs, data_format=self.data_format)
+        inputs = [prep(v) for v in kwargs.values()]
+        return self.rknn.inference(inputs=inputs, data_format=self.data_format)
 
     def release(self):
-        self.rknnlite.release()
+        self.rknn.release()
 
 
 # ============================================================
-# LCM pipeline (adapted from run_rknn-lcm.py)
+# RKNN LCM Pipeline
 # ============================================================
-class RKNN2LatentConsistencyPipeline(DiffusionPipeline):
+class RKNN2LatentConsistencyPipeline:
     def __init__(
         self,
-        text_encoder: RKNN2Model,
-        unet: RKNN2Model,
-        vae_decoder: RKNN2Model,
-        scheduler: LCMScheduler,
-        tokenizer: CLIPTokenizer,
+        text_encoder,
+        unet,
+        vae_decoder,
+        scheduler,
+        tokenizer,
     ):
-        super().__init__()
-        self.register_modules(tokenizer=tokenizer, scheduler=scheduler)
-        self.safety_checker = None
         self.text_encoder = text_encoder
         self.unet = unet
-        self.vae_decoder = vae_decoder
-        self.vae_scale_factor = VAE_SCALE_FACTOR
+        self.vae = vae_decoder
+        self.scheduler = scheduler
+        self.tokenizer = tokenizer
+        self.vae_scale_factor = 8
 
-    # ---- helpers -----------------------------------------------------------
-
-    @staticmethod
-    def _numpy_to_pil(images: np.ndarray) -> List[Image.Image]:
-        if images.ndim == 3:
-            images = images[None, ...]
-        images = (images * 255).round().astype("uint8")
-        if images.shape[-1] == 1:
-            return [Image.fromarray(image.squeeze(), mode="L") for image in images]
-        return [Image.fromarray(image) for image in images]
-
-    @staticmethod
-    def _denormalize(images: np.ndarray) -> np.ndarray:
-        return np.clip(images / 2 + 0.5, 0, 1)
-
-    def _postprocess(self, image: np.ndarray, output_type: str = "pil"):
-        if output_type == "latent":
-            return image
-        do_denormalize = [True] * image.shape[0]
-        image = np.stack(
-            [
-                self._denormalize(image[i]) if do_denormalize[i] else image[i]
-                for i in range(image.shape[0])
-            ],
-            axis=0,
-        )
-        image = image.transpose((0, 2, 3, 1))
-        if output_type == "pil":
-            return self._numpy_to_pil(image)
-        return image
-
-    def _encode_prompt(self, prompt: Union[str, List[str]], num_images_per_prompt: int):
-        if isinstance(prompt, str):
-            batch_size = 1
-        else:
-            batch_size = len(prompt)
-
+    # ---------------- prompt encoding ----------------
+    def encode_prompt(self, prompt):
         text_inputs = self.tokenizer(
             prompt,
             padding="max_length",
             max_length=self.tokenizer.model_max_length,
-            truncation=True,
             return_tensors="np",
         )
-        prompt_embeds = self.text_encoder(input_ids=text_inputs.input_ids.astype(np.int32))[0]
-        prompt_embeds = np.repeat(prompt_embeds, num_images_per_prompt, axis=0)
-        return prompt_embeds
 
-    def _prepare_latents(self, batch_size, num_channels, height, width, dtype, generator):
+        emb = self.text_encoder(
+            input_ids=text_inputs.input_ids.astype(np.int32)
+        )[0]
+        return emb
+
+    # ---------------- latents ----------------
+    def prepare_latents(self, batch_size, channels, height, width, dtype, generator):
         shape = (
             batch_size,
-            num_channels,
+            channels,
             height // self.vae_scale_factor,
             width // self.vae_scale_factor,
         )
+
         if isinstance(generator, np.random.RandomState):
             latents = generator.randn(*shape).astype(dtype)
-        elif isinstance(generator, torch.Generator):
-            latents = torch.randn(*shape, generator=generator).numpy().astype(dtype)
         else:
             latents = np.random.randn(*shape).astype(dtype)
-        latents = latents * self.scheduler.init_noise_sigma
-        return latents
 
+        return latents * self.scheduler.init_noise_sigma
+
+    # ---------------- VAE decode ----------------
+    def decode(self, latents):
+        latents = latents / self.vae.config.get("scaling_factor", 0.18215)
+
+        imgs = [
+            self.vae(latent_sample=latents[i : i + 1])[0]
+            for i in range(latents.shape[0])
+        ]
+        return np.concatenate(imgs, axis=0)
+
+    # ---------------- postprocess ----------------
     @staticmethod
-    def _get_guidance_scale_embedding(w, embedding_dim=512, dtype=np.float32):
-        w = w * 1000.0
-        half_dim = embedding_dim // 2
-        emb = np.log(10000.0) / (half_dim - 1)
-        emb = np.exp(np.arange(half_dim, dtype=dtype) * -emb)
-        emb = w[:, None].astype(dtype) * emb[None, :]
-        emb = np.concatenate([np.sin(emb), np.cos(emb)], axis=1)
-        if embedding_dim % 2 == 1:
-            emb = np.pad(emb, [(0, 0), (0, 1)])
-        return emb
+    def to_pil(image):
+        image = (image * 255).clip(0, 255).astype(np.uint8)
+        if image.shape[-1] == 1:
+            return [Image.fromarray(image.squeeze(), mode="L")]
+        return [Image.fromarray(image)]
 
-    # ---- main call ---------------------------------------------------------
-
+    # ---------------- main forward ----------------
     def __call__(
         self,
-        prompt: Union[str, List[str]] = "",
-        height: int = SD_DEFAULT_HEIGHT,
-        width: int = SD_DEFAULT_WIDTH,
-        num_inference_steps: int = SD_DEFAULT_STEPS,
-        guidance_scale: float = SD_DEFAULT_GUIDANCE_SCALE,
-        num_images_per_prompt: int = 1,
-        generator: Optional[Union[np.random.RandomState, torch.Generator]] = None,
-        output_type: str = "pil",
+        prompt,
+        height,
+        width,
+        num_inference_steps,
+        guidance_scale,
+        generator,
+        output_type="pil",
     ):
-        if isinstance(prompt, str):
-            batch_size = 1
-        else:
-            batch_size = len(prompt)
+        batch_size = 1 if isinstance(prompt, str) else len(prompt)
 
-        if generator is None:
-            generator = np.random.RandomState()
+        # 1. text encode
+        prompt_embeds = self.encode_prompt(prompt)
 
-        # 1. Text encoding
-        t0 = time.time()
-        prompt_embeds = self._encode_prompt(prompt, num_images_per_prompt)
-        logger.info(f"  SD text encode: {time.time() - t0:.1f}s")
-
-        # 2. Set timesteps
+        # 2. scheduler
         self.scheduler.set_timesteps(num_inference_steps)
         timesteps = self.scheduler.timesteps
 
-        # 3. Latents
-        latents = self._prepare_latents(
-            batch_size * num_images_per_prompt,
+        # 3. latents
+        latents = self.prepare_latents(
+            batch_size,
             self.unet.config.get("in_channels", 4),
             height,
             width,
@@ -212,104 +156,141 @@ class RKNN2LatentConsistencyPipeline(DiffusionPipeline):
             generator,
         )
 
-        # 4. Guidance scale embedding (LCM)
-        bs = batch_size * num_images_per_prompt
-        w = np.full(bs, guidance_scale - 1.0, dtype=prompt_embeds.dtype)
-        w_embedding = self._get_guidance_scale_embedding(w, dtype=prompt_embeds.dtype)
+        # 4. guidance embedding
+        w = np.full((batch_size,), guidance_scale - 1.0, dtype=prompt_embeds.dtype)
+        w_embedding = self._guidance_embedding(w, dtype=prompt_embeds.dtype)
 
-        # 5. Denoising loop
-        t_denoise = time.time()
-        for _i, t in enumerate(timesteps):
+        # 5. denoise loop
+        for t in timesteps:
             timestep = np.array([t], dtype=np.int64)
+
             noise_pred = self.unet(
                 sample=latents,
                 timestep=timestep,
                 encoder_hidden_states=prompt_embeds,
                 timestep_cond=w_embedding,
             )[0]
+
             latents, denoised = self.scheduler.step(
-                torch.from_numpy(noise_pred), t, torch.from_numpy(latents), return_dict=False
+                torch.from_numpy(noise_pred),
+                t,
+                torch.from_numpy(latents),
+                return_dict=False,
             )
-            latents, denoised = latents.numpy(), denoised.numpy()
-        logger.info(f"  SD denoise ({num_inference_steps} steps): {time.time() - t_denoise:.1f}s")
 
-        # 6. Decode
-        t_decode = time.time()
-        denoised = denoised / self.vae_decoder.config.get("scaling_factor", 0.18215)
-        image = np.concatenate(
-            [self.vae_decoder(latent_sample=denoised[i : i + 1])[0] for i in range(denoised.shape[0])]
-        )
-        image = self._postprocess(image, output_type=output_type)
-        logger.info(f"  SD decode: {time.time() - t_decode:.1f}s")
+            latents = latents.numpy()
+            denoised = denoised.numpy()
 
-        return StableDiffusionPipelineOutput(images=image, nsfw_content_detected=None)
+        # 6. decode
+        image = self.decode(denoised)
 
-    def release(self):
-        self.text_encoder.release()
-        self.unet.release()
-        self.vae_decoder.release()
+        image = image.transpose(0, 2, 3, 1)
+        image = image / 2 + 0.5
+        image = np.clip(image, 0, 1)
+
+        if output_type == "pil":
+            return {"images": self.to_pil(image)}
+        return {"images": image}
+
+    # ---------------- guidance embedding ----------------
+    @staticmethod
+    def _guidance_embedding(w, embedding_dim=512, dtype=np.float32):
+        w = w * 1000
+        half = embedding_dim // 2
+        emb = np.log(10000.0) / (half - 1)
+        emb = np.exp(np.arange(half, dtype=dtype) * -emb)
+        emb = w[:, None] * emb[None, :]
+        emb = np.concatenate([np.sin(emb), np.cos(emb)], axis=1)
+        return emb
 
 
 # ============================================================
-# Top-level SD engine
+# SD Engine
 # ============================================================
 class SDEngine:
     def __init__(self):
-        self.pipe: Optional[RKNN2LatentConsistencyPipeline] = None
-        self._lock = threading.Lock()
+        self.pipe = None
+        self.lock = None
 
-    def load(self):
-        if self.pipe is not None:
-            return
-        logger.info("Loading SD LCM pipeline …")
+    def load(self, model_path, tokenizer_path):
+        logger.info("Loading RK3588 SD pipeline...")
 
-        if not os.path.exists(SD_SCHEDULER_CONFIG):
-            raise FileNotFoundError(f"scheduler config not found: {SD_SCHEDULER_CONFIG}")
-        scheduler_config = json.load(open(SD_SCHEDULER_CONFIG))
-        scheduler = LCMScheduler.from_config(scheduler_config)
+        scheduler = LCMScheduler.from_config(
+            json.load(open(os.path.join(model_path, "scheduler/scheduler_config.json")))
+        )
 
-        if not os.path.exists(SD_CLIP_TOKENIZER):
-            raise FileNotFoundError(f"CLIP tokenizer not found: {SD_CLIP_TOKENIZER}")
-        tokenizer = CLIPTokenizer.from_pretrained(SD_CLIP_TOKENIZER)
+        tokenizer = CLIPTokenizer.from_pretrained(tokenizer_path)
 
         self.pipe = RKNN2LatentConsistencyPipeline(
-            text_encoder=RKNN2Model(SD_TEXT_ENCODER_DIR, data_format="nchw"),
-            unet=RKNN2Model(SD_UNET_DIR, data_format="nhwc"),
-            vae_decoder=RKNN2Model(SD_VAE_DECODER_DIR, data_format="nhwc"),
+            text_encoder=RKNN2Model(os.path.join(model_path, "text_encoder"), "nchw"),
+            unet=RKNN2Model(os.path.join(model_path, "unet"), "nhwc"),
+            vae_decoder=RKNN2Model(os.path.join(model_path, "vae_decoder"), "nhwc"),
             scheduler=scheduler,
             tokenizer=tokenizer,
         )
-        logger.info("SD pipeline ready")
 
-    def generate(
-        self,
-        prompt: str,
-        negative_prompt: str = "",
-        width: int = SD_DEFAULT_WIDTH,
-        height: int = SD_DEFAULT_HEIGHT,
-        num_inference_steps: int = SD_DEFAULT_STEPS,
-        guidance_scale: float = SD_DEFAULT_GUIDANCE_SCALE,
-    ) -> str:
-        """Generate image and return base64-encoded PNG."""
-        self.load()
-        with self._lock:
-            result = self.pipe(
-                prompt=prompt,
-                height=height,
-                width=width,
-                num_inference_steps=num_inference_steps,
-                guidance_scale=guidance_scale,
-                generator=np.random.RandomState(),
-                output_type="pil",
-            )
-            img = result.images[0]
-            buf = io.BytesIO()
-            img.save(buf, format="PNG")
-            return base64.b64encode(buf.getvalue()).decode("utf-8")
+        logger.info("Pipeline ready")
 
-    def release(self):
-        if self.pipe:
-            self.pipe.release()
+    def generate(self, model_path, tokenizer_path, prompt, size, steps, guidance):
+        self.load(model_path, tokenizer_path)
+
+        h, w = map(int, size.split("x"))
+
+        result = self.pipe(
+            prompt=prompt,
+            height=h,
+            width=w,
+            num_inference_steps=steps,
+            guidance_scale=guidance,
+            generator=np.random.RandomState(),
+            output_type="pil",
+        )
+
+        img = result["images"][0]
+
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+
+        return base64.b64encode(buf.getvalue()).decode()
 
 
-sd_engine = SDEngine()
+# ============================================================
+# CLI
+# ============================================================
+def main():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--prompt", required=True)
+    parser.add_argument("-i", required=True, help="model dir")
+    parser.add_argument("-o", required=True)
+    parser.add_argument("--tokenizer", required=True)
+
+    parser.add_argument("--seed", default=42, type=int)
+    parser.add_argument("--size", default="512x512")
+    parser.add_argument("--steps", default=4, type=int)
+    parser.add_argument("--guidance", default=7.5, type=float)
+
+    args = parser.parse_args()
+
+    engine = SDEngine()
+
+    img_b64 = engine.generate(
+        args.i,
+        args.tokenizer,
+        args.prompt,
+        args.size,
+        args.steps,
+        args.guidance,
+    )
+
+    out_path = os.path.join(args.o, "out.png")
+    os.makedirs(args.o, exist_ok=True)
+
+    with open(out_path, "wb") as f:
+        f.write(base64.b64decode(img_b64))
+
+    print("saved:", out_path)
+
+
+if __name__ == "__main__":
+    main()
