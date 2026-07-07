@@ -398,6 +398,33 @@ button {
   stroke: none;
 }
 
+.scratch-blocks-host .blocklySvg {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+.scratch-blocks-host .blocklyBlockCanvas .blocklyDraggable,
+.scratch-blocks-host .blocklyFlyout .blocklyDraggable {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+.scratch-blocks-host .blocklyPath,
+.scratch-blocks-host .blocklyPathLight,
+.scratch-blocks-host .blocklyPathDark {
+  fill-opacity: 1 !important;
+  stroke-opacity: 1 !important;
+}
+
+.scratch-blocks-host .blocklyText,
+.scratch-blocks-host .blocklyEditableText text,
+.scratch-blocks-host .blocklyNonEditableText text,
+.scratch-blocks-host .blocklyFlyoutLabelText {
+  opacity: 1 !important;
+  fill-opacity: 1 !important;
+  text-rendering: geometricPrecision;
+}
+
 .scratch-blocks-host .blocklyToolboxDiv {
   border-right: 1px solid #ddd;
 }

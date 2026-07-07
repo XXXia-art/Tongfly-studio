@@ -19,6 +19,21 @@ const directionToType = {
   '向下': 'down'
 };
 
+const API_BASE = import.meta.env?.VITE_API_BASE_URL || '';
+
+async function postJson(path, body) {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => 'unknown error');
+    throw new Error(`HTTP ${response.status}: ${text}`);
+  }
+  return response.json();
+}
+
 class DroneBridgeMock {
   constructor() {
     this.state = {...initialDroneState};
@@ -48,18 +63,22 @@ class DroneBridgeMock {
   }
 
   async sendMissionFile(missionFile) {
+    const result = await postJson('/api/drone/mission', missionFile);
     this.lastMissionFile = {
       ...missionFile,
       receivedAt: new Date().toISOString(),
-      route: 'web-editor -> onboard-chip -> flight-controller'
+      route: result.udp?.target
+        ? `web-editor -> fastapi -> udp://${result.udp.target}`
+        : 'web-editor -> fastapi'
     };
     this.state.flash = 1;
     this.notify();
     return {
-      ok: true,
+      ok: result.ok,
       missionId: missionFile.id,
-      bytes: new TextEncoder().encode(JSON.stringify(missionFile)).length,
-      route: this.lastMissionFile.route
+      bytes: result.udp?.bytes ?? new TextEncoder().encode(JSON.stringify(missionFile)).length,
+      route: this.lastMissionFile.route,
+      udp: result.udp
     };
   }
 

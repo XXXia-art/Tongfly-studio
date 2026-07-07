@@ -1,6 +1,9 @@
 import logging
 import threading
 import uvicorn
+import json
+import os
+import socket
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,6 +16,9 @@ logging.basicConfig(level=logging.INFO)
 vlm_lock = threading.Lock()
 sd_lock = threading.Lock()
 model_memory_lock = threading.Lock()
+
+MISSION_UDP_HOST = os.environ.get("TONGFLY_MISSION_UDP_HOST", "127.0.0.1")
+MISSION_UDP_PORT = int(os.environ.get("TONGFLY_MISSION_UDP_PORT", "9000"))
 
 
 @asynccontextmanager
@@ -116,6 +122,19 @@ def run_sd_generate(req: dict):
         raise HTTPException(500, str(e))
 
 
+def send_mission_udp(mission_file: dict):
+    data = json.dumps(mission_file, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sent = sock.sendto(data, (MISSION_UDP_HOST, MISSION_UDP_PORT))
+    finally:
+        sock.close()
+    return {
+        "target": f"{MISSION_UDP_HOST}:{MISSION_UDP_PORT}",
+        "bytes": sent,
+    }
+
+
 @app.post("/vlm/chat")
 @app.post("/api/vlm/chat")
 def vlm_chat(req: dict):
@@ -132,6 +151,26 @@ def vlm_describe(req: dict):
 @app.post("/api/sd/generate")
 def sd_generate(req: dict):
     return run_sd_generate(req)
+
+
+@app.post("/drone/mission")
+@app.post("/api/drone/mission")
+def drone_mission(req: dict):
+    try:
+        if not isinstance(req.get("flightActions"), list):
+            raise HTTPException(400, "Missing flightActions")
+        udp_result = send_mission_udp(req)
+        return {
+            "ok": True,
+            "missionId": req.get("id"),
+            "actions": len(req.get("flightActions", [])),
+            "udp": udp_result,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.exception("Mission UDP send failed")
+        raise HTTPException(502, f"Mission UDP send failed: {e}")
 
 
 if __name__ == "__main__":
