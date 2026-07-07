@@ -7,6 +7,12 @@ set -e
 cd "$(dirname "$0")"
 
 LOG_FILE="server.log"
+QWEN_DIR="${TONGFLY_QWEN_DIR:-$(cd ../.. && pwd)/QWEN2-VL}"
+QWEN_LIB_DIR="$QWEN_DIR/install/demo_Linux_aarch64/lib"
+
+if [ -d "$QWEN_LIB_DIR" ]; then
+  export LD_LIBRARY_PATH="$QWEN_LIB_DIR:${LD_LIBRARY_PATH:-}"
+fi
 
 echo "Starting inference server (RK3588 NPU) …"
 nohup python3 main.py > "$LOG_FILE" 2>&1 &

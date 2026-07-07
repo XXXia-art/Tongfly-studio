@@ -48,9 +48,16 @@ class DroneScratchExtension {
         {
           opcode: 'turn',
           blockType: BlockType.COMMAND,
-          text: '转向 速度 [SPEED] 度/秒 时间 [SECONDS] 秒',
+          text: '转向 30°/s 时间 [SECONDS] 秒',
           arguments: {
-            SPEED: {type: ArgumentType.NUMBER, defaultValue: 45},
+            SECONDS: {type: ArgumentType.NUMBER, defaultValue: 1}
+          }
+        },
+        {
+          opcode: 'turnLeft',
+          blockType: BlockType.COMMAND,
+          text: '转向 30°/s 时间 [SECONDS] 秒',
+          arguments: {
             SECONDS: {type: ArgumentType.NUMBER, defaultValue: 1}
           }
         },
@@ -129,7 +136,15 @@ class DroneScratchExtension {
   turn(args) {
     return this.services.droneBridge.runCommand({
       type: 'turn',
-      speed: args.SPEED,
+      speed: 30,
+      seconds: args.SECONDS
+    });
+  }
+
+  turnLeft(args) {
+    return this.services.droneBridge.runCommand({
+      type: 'turn',
+      speed: -30,
       seconds: args.SECONDS
     });
   }

@@ -70,19 +70,35 @@ def health():
     }
 
 
-@app.post("/vlm/chat")
-def vlm_chat(req: dict):
+def run_vlm_chat(req: dict):
     try:
+        text = req.get("text")
+        if not text:
+            raise HTTPException(400, "Missing text")
         with model_memory_lock:
             ensure_vlm_active()
             with vlm_lock:
-                return {"result": vlm_engine.chat(req["text"])}
+                result = vlm_engine.chat(text)
+        return {"result": result, "response": result}
     except Exception as e:
+        logging.exception("VLM chat failed")
         raise HTTPException(500, str(e))
 
 
-@app.post("/sd/generate")
-def sd_generate(req: dict):
+def run_vlm_describe(req: dict):
+    try:
+        question = req.get("question") or req.get("text") or "请描述当前画面。"
+        with model_memory_lock:
+            ensure_vlm_active()
+            with vlm_lock:
+                result = vlm_engine.describe(question, req.get("image_base64"))
+        return {"result": result, "response": result}
+    except Exception as e:
+        logging.exception("VLM describe failed")
+        raise HTTPException(500, str(e))
+
+
+def run_sd_generate(req: dict):
     try:
         with model_memory_lock:
             ensure_sd_active()
@@ -91,12 +107,31 @@ def sd_generate(req: dict):
                     req["prompt"],
                     req.get("width", 512),
                     req.get("height", 512),
-                    req.get("steps", 4),
-                    req.get("guidance", 7.5),
+                    req.get("steps", req.get("num_inference_steps", 4)),
+                    req.get("guidance", req.get("guidance_scale", 7.5)),
                 )
-        return {"image": img}
+        return {"image": img, "image_base64": img}
     except Exception as e:
+        logging.exception("SD generate failed")
         raise HTTPException(500, str(e))
+
+
+@app.post("/vlm/chat")
+@app.post("/api/vlm/chat")
+def vlm_chat(req: dict):
+    return run_vlm_chat(req)
+
+
+@app.post("/vlm/describe")
+@app.post("/api/vlm/describe")
+def vlm_describe(req: dict):
+    return run_vlm_describe(req)
+
+
+@app.post("/sd/generate")
+@app.post("/api/sd/generate")
+def sd_generate(req: dict):
+    return run_sd_generate(req)
 
 
 if __name__ == "__main__":

@@ -39,8 +39,16 @@ export const blockCatalog = {
         kind: 'command',
         color: SCRATCH_MOTION,
         icon: '↻',
-        text: '转向 [speed] 度/秒 [seconds] 秒',
-        defaults: {speed: 45, seconds: 1}
+        text: '转向 30°/s [seconds] 秒',
+        defaults: {seconds: 1}
+      },
+      {
+        id: 'turnLeft',
+        kind: 'command',
+        color: SCRATCH_MOTION,
+        icon: '↺',
+        text: '转向 30°/s [seconds] 秒',
+        defaults: {seconds: 1}
       }
     ]
   },

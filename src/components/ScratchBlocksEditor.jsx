@@ -58,6 +58,7 @@ const blockTypes = {
   up: 'drone_up',
   down: 'drone_down',
   turn: 'drone_turn',
+  turnLeft: 'drone_turn_left',
   hover: 'drone_hover',
   land: 'drone_land',
   returnHome: 'drone_return_home',
@@ -123,8 +124,9 @@ const ScratchBlocksEditor = forwardRef(function ScratchBlocksEditor({services, o
 
   useImperativeHandle(ref, () => ({
     runProgram: async () => {
-      await deployWorkspace(workspaceRef.current, services, onLog);
+      const missionFile = await deployWorkspace(workspaceRef.current, services, onLog);
       await runWorkspace(workspaceRef.current, services, onLog);
+      return missionFile;
     },
     resetProgram: () => loadStarterWorkspace(workspaceRef.current),
     getWorkspaceXml: () => serializeWorkspace(workspaceRef.current),
@@ -289,26 +291,30 @@ function registerDroneBlocks() {
     };
   });
 
-  ScratchBlocks.Blocks[blockTypes.turn] = {
-    init() {
+  [
+    [blockTypes.turn, '转向 30°/s', 'rotate-right.svg', '↻'],
+    [blockTypes.turnLeft, '转向 30°/s', 'rotate-left.svg', '↺']
+  ].forEach(([type, label, icon, alt]) => {
+    ScratchBlocks.Blocks[type] = {
+      init() {
       const ws = this.workspace.options.parentWorkspace ?? this.workspace;
       this.jsonInit({
-        message0: '转向 %1 速度 %2 度/秒 时间 %3 秒',
+        message0: `${label} %1 时间 %2 秒`,
         args0: [
           {
             type: 'field_image',
-            src: ws.options.pathToMedia + 'rotate-right.svg',
+            src: ws.options.pathToMedia + icon,
             width: 24,
             height: 24,
-            alt: '↻'
+            alt
           },
-          {type: 'input_value', name: 'SPEED', check: 'Number'},
           {type: 'input_value', name: 'SECONDS', check: 'Number'}
         ],
         extensions: ['colours_motion', 'shape_statement']
       });
-    }
-  };
+      }
+    };
+  });
 
   ScratchBlocks.Blocks[blockTypes.hover] = {
     init() {
@@ -664,7 +670,8 @@ function buildToolboxXml() {
   return `<xml id="toolbox" style="display: none">
     <category name="飞行" colour="#4C97FF" secondaryColour="#4280D7">
       ${flightBlocks.map(([type, , , speed, seconds]) => flightBlockXml(type, speed, seconds)).join('')}
-      ${flightBlockXml(blockTypes.turn, 45, 1)}
+      ${turnBlockXml(blockTypes.turn, 1)}
+      ${turnBlockXml(blockTypes.turnLeft, 1)}
       <block type="${blockTypes.hover}">${numberValue('SECONDS', 2)}</block>
     </category>
     <category name="逻辑" colour="#FFAB19" secondaryColour="#EC9C13">
@@ -724,6 +731,12 @@ function moduleBlockXml(moduleName) {
 function flightBlockXml(type, speed, seconds) {
   return `<block type="${type}">
     ${numberValue('SPEED', speed)}
+    ${numberValue('SECONDS', seconds)}
+  </block>`;
+}
+
+function turnBlockXml(type, seconds) {
+  return `<block type="${type}">
     ${numberValue('SECONDS', seconds)}
   </block>`;
 }
@@ -820,12 +833,122 @@ function compileWorkspaceToMission(workspace) {
     source: {
       type: 'scratch-blocks-xml',
       xml: sourceXml
-    }
+    },
+    flightActions: compileProgramsToFlightActions(programs)
   };
   return {
     ...body,
     checksum: checksumJson(body)
   };
+}
+
+function compileProgramsToFlightActions(programs) {
+  return programs.flatMap(program => {
+    if (program.kind !== 'stack') return [];
+    return compileStepsToFlightActions(program.steps);
+  });
+}
+
+function compileStepsToFlightActions(steps) {
+  return steps.flatMap(step => compileStepToFlightActions(step));
+}
+
+function compileStepToFlightActions(step) {
+  if (!step) return [];
+
+  const params = step.params || {};
+  const speed = positiveNumberFromParam(params.speed, 0.15);
+  const seconds = positiveNumberFromParam(params.seconds, positiveNumberFromParam(params.duration, 3));
+
+  if (step.opcode === 'forward') return [flightAction({vx: speed, duration: seconds})];
+  if (step.opcode === 'backward') return [flightAction({vx: -speed, duration: seconds})];
+  if (step.opcode === 'left') return [flightAction({vy: -speed, duration: seconds})];
+  if (step.opcode === 'right') return [flightAction({vy: speed, duration: seconds})];
+  if (step.opcode === 'up') return [flightAction({vz: speed, duration: seconds})];
+  if (step.opcode === 'down') return [flightAction({vz: -speed, duration: seconds})];
+  if (step.opcode === 'turn') return [flightAction({yaw: 30, duration: seconds})];
+  if (step.opcode === 'turn_left') return [flightAction({yaw: -30, duration: seconds})];
+  if (step.opcode === 'hover' || step.opcode === 'wait') {
+    return [flightAction({duration: seconds})];
+  }
+  if (step.opcode === 'land') {
+    return [flightAction({vz: -0.08, duration: 3})];
+  }
+  if (step.opcode === 'return_home') {
+    return [flightAction({vx: -0.15, duration: 3})];
+  }
+  if (step.opcode === 'stop_flight' || step.opcode === 'emergency_stop') {
+    return [flightAction({duration: 0.2})];
+  }
+  if (step.opcode === 'follow_target') {
+    return [flightAction({vx: 0.15, duration: 3})];
+  }
+  if (step.opcode === 'avoid_target') {
+    return [flightAction({vx: -0.15, duration: 3})];
+  }
+  if (step.opcode === 'guard_unsafe_hover') {
+    return [flightAction({duration: 3})];
+  }
+  if (step.opcode === 'guard_too_close_stop') {
+    return [flightAction({duration: 0.2})];
+  }
+  if (step.opcode === 'guard_battery_return') {
+    return [flightAction({vx: -0.15, duration: 3})];
+  }
+  if (step.opcode === 'repeat') {
+    const times = Math.max(0, Math.min(50, Math.round(positiveNumberFromParam(params.times, 1))));
+    return Array.from({length: times}, () => compileStepsToFlightActions(params.steps || [])).flat();
+  }
+  if (step.opcode === 'forever') {
+    const maxIterations = Math.max(0, Math.min(FOREVER_DEMO_LIMIT, Math.round(positiveNumberFromParam(params.maxIterations, FOREVER_DEMO_LIMIT))));
+    return Array.from({length: maxIterations}, () => compileStepsToFlightActions(params.steps || [])).flat();
+  }
+  if (step.opcode === 'repeat_until') {
+    return compileStepsToFlightActions(params.steps || []);
+  }
+  if (step.opcode === 'if') {
+    return compileStepsToFlightActions(params.steps || []);
+  }
+  if (step.opcode === 'call_module') {
+    return compileSavedModuleToFlightActions(valueFromParam(params.module, ''));
+  }
+
+  return [];
+}
+
+function compileSavedModuleToFlightActions(moduleName) {
+  if (!moduleName) return [];
+  const moduleXml = window.localStorage.getItem(`droneModule:${moduleName}`);
+  if (!moduleXml) return [];
+
+  const moduleWorkspace = new ScratchBlocks.Workspace();
+  try {
+    ScratchBlocks.Xml.domToWorkspace(ScratchBlocks.utils.xml.textToDom(moduleXml), moduleWorkspace);
+    return compileWorkspaceToMission(moduleWorkspace).flightActions;
+  } finally {
+    moduleWorkspace.dispose();
+  }
+}
+
+function flightAction(overrides = {}) {
+  return {
+    vx: 0.0,
+    vy: 0.0,
+    vz: 0.0,
+    yaw: 0,
+    duration: 3,
+    ...overrides
+  };
+}
+
+function positiveNumberFromParam(param, fallback) {
+  const value = Number(valueFromParam(param, fallback));
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+function valueFromParam(param, fallback) {
+  if (param && param.kind === 'literal') return param.value;
+  return param ?? fallback;
 }
 
 function checksumJson(value) {
@@ -897,7 +1020,8 @@ function compileCommand(block) {
   }
 
   const commandMap = {
-    [blockTypes.turn]: ['turn', '转向', {speed: 'SPEED', seconds: 'SECONDS'}],
+    [blockTypes.turn]: ['turn', '顺时针旋转 30°/s', {seconds: 'SECONDS'}],
+    [blockTypes.turnLeft]: ['turn_left', '逆时针旋转 30°/s', {seconds: 'SECONDS'}],
     [blockTypes.hover]: ['hover', '悬停', {seconds: 'SECONDS'}],
     [blockTypes.land]: ['land', '降落', {}],
     [blockTypes.returnHome]: ['return_home', '返航', {}],
@@ -1071,10 +1195,10 @@ async function runBlock(block, services, onLog) {
     return;
   }
 
-  if (type === blockTypes.turn) {
-    const speed = await readNumberInput(block, 'SPEED', services, 45);
+  if (type === blockTypes.turn || type === blockTypes.turnLeft) {
     const seconds = await readNumberInput(block, 'SECONDS', services, 1);
-    onLog?.(`转向：速度 ${speed}，时间 ${seconds} 秒`);
+    const speed = type === blockTypes.turnLeft ? -30 : 30;
+    onLog?.(`${speed > 0 ? '顺时针旋转' : '逆时针旋转'}：速度 ${speed}，时间 ${seconds} 秒`);
     await services.droneBridge.runCommand({type: 'turn', speed, seconds});
     return;
   }
@@ -1355,6 +1479,7 @@ function blockLabel(block) {
   if (match) return match[1];
   const labels = {
     [blockTypes.turn]: '转向',
+    [blockTypes.turnLeft]: '逆时针旋转',
     [blockTypes.yoloDetect]: 'YOLO 识别',
     [blockTypes.askVision]: '询问画面',
     [blockTypes.chat]: '问小助手',

@@ -8,6 +8,8 @@ import ScratchBlocksEditor from './components/ScratchBlocksEditor.jsx';
 
 export default function App() {
   const [moduleName, setModuleName] = useState('阶梯式飞行');
+  const [lastMission, setLastMission] = useState(null);
+  const [logs, setLogs] = useState([]);
   const blocksEditorRef = useRef(null);
   const droneStageRef = useRef(null);
   const services = useMemo(() => ({droneBridge, vlmClient, sdClient}), []);
@@ -16,6 +18,7 @@ export default function App() {
 
   const addLog = text => {
     console.info(text);
+    setLogs(current => [...current.slice(-7), text]);
   };
 
   const saveModule = () => {
@@ -28,7 +31,8 @@ export default function App() {
 
   const runPreview = async () => {
     addLog('开始运行 Scratch Blocks 工作区。');
-    await blocksEditorRef.current?.runProgram();
+    const missionFile = await blocksEditorRef.current?.runProgram();
+    if (missionFile) setLastMission(missionFile);
   };
 
   return (
@@ -70,6 +74,18 @@ export default function App() {
 
         <aside className="right-panel">
           <DroneStage ref={droneStageRef} bridge={droneBridge} />
+          <section className="compile-panel">
+            <header>
+              <h2>Flight JSON</h2>
+              <span>{lastMission ? lastMission.id : 'waiting'}</span>
+            </header>
+            <pre>{lastMission
+              ? JSON.stringify(lastMission.flightActions || [], null, 2)
+              : 'Click Run to compile blocks into flightActions.'}</pre>
+            <div className="compile-log">
+              {logs.map((log, index) => <span key={`${log}-${index}`}>{log}</span>)}
+            </div>
+          </section>
           <VlmChat
             bridge={droneBridge}
             vlmClient={vlmClient}

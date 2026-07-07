@@ -1,6 +1,6 @@
 import {yoloTargets} from '../data/droneBlockCatalog.js';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+const API_BASE = import.meta.env?.VITE_API_BASE_URL || '';
 
 async function postJson(path, body) {
   const response = await fetch(`${API_BASE}${path}`, {

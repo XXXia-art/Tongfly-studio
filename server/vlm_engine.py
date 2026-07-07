@@ -4,6 +4,7 @@ import logging
 import threading
 import os
 import time
+import binascii
 import numpy as np
 import cv2
 from rknnlite.api import RKNNLite
@@ -24,8 +25,8 @@ LLM_MODEL = os.environ.get(
 )
 RKLLM_LIB_CANDIDATES = [
     os.environ.get("TONGFLY_RKLLM_LIB"),
-    os.path.join(QWEN_DIR, "install", "demo_Linux_aarch64", "lib", "librkllmrt.so"),
     "/home/elf/librkllmrt.so",
+    os.path.join(QWEN_DIR, "install", "demo_Linux_aarch64", "lib", "librkllmrt.so"),
 ]
 RKLLM_LIB = next((path for path in RKLLM_LIB_CANDIDATES if path and os.path.exists(path)), RKLLM_LIB_CANDIDATES[1])
 
@@ -156,6 +157,7 @@ CallbackType = ctypes.CFUNCTYPE(
 
 class VisionEncoder:
     def __init__(self, path):
+        logger.info("Loading vision model: %s", path)
         self.rknn = RKNNLite()
         ret = self.rknn.load_rknn(path)
         if ret != 0:
@@ -167,6 +169,7 @@ class VisionEncoder:
             ret = self.rknn.init_runtime(core_mask=core_mask)
         if ret != 0:
             raise RuntimeError("Failed to initialize vision RKNN runtime")
+        logger.info("Vision model loaded")
 
     def preprocess(self, img):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -189,6 +192,8 @@ class VisionEncoder:
 
 class LLMEngine:
     def __init__(self, model_path):
+        logger.info("Loading RKLLM library: %s", RKLLM_LIB)
+        logger.info("Loading LLM model: %s", model_path)
         self.lock = threading.Lock()
         self.lib = ctypes.CDLL(RKLLM_LIB)
         self.handle = ctypes.c_void_p()
@@ -239,6 +244,7 @@ class LLMEngine:
         ret = self.fn_init(ctypes.byref(self.handle), ctypes.byref(self.param), self.callback)
         if ret != 0:
             raise RuntimeError(f"rkllm_init failed with code {ret}")
+        logger.info("LLM model loaded")
 
         self.fn_run = self.lib.rkllm_run
         self.fn_run.argtypes = [
@@ -335,6 +341,24 @@ class VLMEngine:
         self.load()
         with self.lock:
             return self.llm.chat(text)
+
+    def describe(self, text, image_base64):
+        self.load()
+        if not image_base64:
+            return self.chat(text)
+        if "," in image_base64:
+            image_base64 = image_base64.split(",", 1)[1]
+        try:
+            raw = base64.b64decode(image_base64)
+        except binascii.Error as exc:
+            raise ValueError("Invalid image_base64 payload") from exc
+        img_array = np.frombuffer(raw, dtype=np.uint8)
+        img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+        if img is None:
+            raise ValueError("Could not decode image_base64 as an image")
+        with self.lock:
+            image_embed = self.vision.encode(img)
+            return self.llm.chat_multimodal(text, image_embed)
 
     def release(self):
         with self.lock:
