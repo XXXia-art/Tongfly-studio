@@ -801,10 +801,14 @@ async function deployWorkspace(workspace, services, onLog) {
     return null;
   }
 
-  const result = await services.droneBridge.sendMissionFile(missionFile);
-  if (result.ok) {
-    onLog?.(`任务文件 ${missionFile.id} 已发送到机载芯片，大小 ${result.bytes} 字节。`);
-    onLog?.(`发送链路：${result.route}`);
+  try {
+    const result = await services.droneBridge.sendMissionFile(missionFile);
+    if (result.ok) {
+      onLog?.(`任务文件 ${missionFile.id} 已发送，大小 ${result.bytes} 字节。`);
+      onLog?.(`发送链路：${result.route}`);
+    }
+  } catch (error) {
+    onLog?.(`任务已编译，但发送失败：${error.message}`);
   }
   return missionFile;
 }

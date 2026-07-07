@@ -31,8 +31,16 @@ export default function App() {
 
   const runPreview = async () => {
     addLog('开始运行 Scratch Blocks 工作区。');
-    const missionFile = await blocksEditorRef.current?.runProgram();
-    if (missionFile) setLastMission(missionFile);
+    const compiledMission = blocksEditorRef.current?.getMissionFile();
+    if (compiledMission?.programs?.length) {
+      setLastMission(compiledMission);
+    }
+    try {
+      const missionFile = await blocksEditorRef.current?.runProgram();
+      if (missionFile) setLastMission(missionFile);
+    } catch (error) {
+      addLog(`运行失败：${error.message}`);
+    }
   };
 
   return (
