@@ -5,8 +5,8 @@ vite-dev.pid
 scratch-drone-preview.png
 .env.local
 
-# Python inference server
-server/__pycache__/
-server/*.pyc
-server/.pytest_cache/
-server/*.log
+# Archived Python inference server
+assets/legacy-server/__pycache__/
+assets/legacy-server/*.pyc
+assets/legacy-server/.pytest_cache/
+assets/legacy-server/*.log

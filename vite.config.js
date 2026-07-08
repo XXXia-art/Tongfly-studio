@@ -2,7 +2,6 @@ import react from '@vitejs/plugin-react';
 import {defineConfig} from 'vite';
 import dgram from 'node:dgram';
 
-const API_TARGET = process.env.VITE_API_TARGET || 'http://localhost:8000';
 const MODE_UDP_HOST = process.env.TONGFLY_MODE_UDP_HOST || '127.0.0.1';
 const MODE_UDP_PORT = Number(process.env.TONGFLY_MODE_UDP_PORT || 9100);
 const CONTENT_UDP_HOST = process.env.TONGFLY_CONTENT_UDP_HOST || '127.0.0.1';
@@ -85,13 +84,6 @@ export default defineConfig({
   plugins: [react(), udpBridgePlugin()],
   server: {
     port: 8610,
-    strictPort: false,
-    proxy: {
-      '/api': {
-        target: API_TARGET,
-        changeOrigin: true,
-        rewrite: path => path
-      }
-    }
+    strictPort: false
   }
 });

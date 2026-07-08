@@ -1,28 +1,13 @@
-const API_BASE = import.meta.env?.VITE_API_BASE_URL || '';
-
-async function postJson(path, body) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(body)
-  });
-  if (!response.ok) {
-    const text = await response.text().catch(() => 'unknown error');
-    throw new Error(`HTTP ${response.status}: ${text}`);
-  }
-  return response.json();
-}
+import {sendContent} from './controlBus.js';
 
 class SDClient {
   async createImage(prompt) {
-    const data = await postJson('/api/sd/generate', {
-      prompt,
-      width: 256,
-      height: 256,
-      num_inference_steps: 4,
-      guidance_scale: 8.5
+    const result = await sendContent({
+      type: 'creative_paint_input',
+      source: '创意喷绘',
+      payload: {prompt}
     });
-    return `data:image/png;base64,${data.image_base64}`;
+    return `已发送到总控状态机：${result.udp?.target || 'content UDP'}`;
   }
 }
 

@@ -1,5 +1,35 @@
 # 童飞工坊 Scratch GUI 迁移版
 
+## 当前运行方式
+
+当前主流程只需要启动前端：
+
+```bash
+npm install
+npm run dev -- --host 0.0.0.0
+```
+
+前端通过 Vite 内置的 UDP 桥把数据发给总控状态机：
+
+- `mode` 模块：UDP `127.0.0.1:9100`
+- `content` 模块：UDP `127.0.0.1:9200`
+
+可以通过环境变量修改目标地址：
+
+```bash
+TONGFLY_MODE_UDP_HOST=127.0.0.1 TONGFLY_MODE_UDP_PORT=9100 \
+TONGFLY_CONTENT_UDP_HOST=127.0.0.1 TONGFLY_CONTENT_UDP_PORT=9200 \
+npm run dev -- --host 0.0.0.0
+```
+
+旧的 FastAPI 后端、VLM/SD 模型调用代码已经归档到：
+
+```text
+assets/legacy-server/
+```
+
+这部分当前主流程不再使用，只作为历史代码和参考保留。
+
 这个目录是把现有单文件原型迁移到 Scratch 生态的第一步。根目录的 `index.html` 仍然保留，`scratch-drone/` 负责后续可扩展开发。
 
 ## 为什么这样拆
