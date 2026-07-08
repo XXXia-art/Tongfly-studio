@@ -687,15 +687,16 @@ button {
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
   padding: 10px 12px;
-  background: #efe7d5;
+  background: #f2ead9;
 }
 
 .hud strong {
   padding: 9px;
   border-radius: 8px;
   color: #fff;
-  background: #345845;
+  background: linear-gradient(180deg, #405f70 0%, #2d4858 100%);
   font-size: 13px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
 .chat-feed {

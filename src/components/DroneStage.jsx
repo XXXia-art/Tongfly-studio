@@ -23,37 +23,54 @@ const DroneStage = React.forwardRef(function DroneStage({bridge}, ref) {
       const w = canvas.width;
       const h = canvas.height;
       const t = performance.now() / 1000;
-      const horizon = h * 0.52 + Math.sin(t * 0.8) * 8 - drone.altitude * 6;
+      const glowX = w * 0.52 + Math.sin(t * 0.35) * 18;
+      const glowY = h * 0.42 + Math.cos(t * 0.28) * 10;
 
-      const sky = ctx.createLinearGradient(0, 0, 0, h);
-      sky.addColorStop(0, '#8ec7dc');
-      sky.addColorStop(0.58, '#d9e4c4');
-      sky.addColorStop(1, '#6ca46c');
-      ctx.fillStyle = sky;
+      const backdrop = ctx.createLinearGradient(0, 0, w, h);
+      backdrop.addColorStop(0, '#f7efe3');
+      backdrop.addColorStop(0.42, '#d9ece8');
+      backdrop.addColorStop(1, '#b8d0ed');
+      ctx.fillStyle = backdrop;
       ctx.fillRect(0, 0, w, h);
 
-      ctx.fillStyle = '#75a96b';
-      ctx.fillRect(0, horizon, w, h - horizon);
-      ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-      ctx.lineWidth = 5;
-      ctx.beginPath();
-      ctx.moveTo(w * 0.34 + drone.lateral * 8, horizon);
-      ctx.lineTo(w * 0.22, h);
-      ctx.moveTo(w * 0.66 + drone.lateral * 8, horizon);
-      ctx.lineTo(w * 0.78, h);
-      ctx.stroke();
+      const framePad = 26;
+      const frameW = w - framePad * 2;
+      const frameH = h - framePad * 2;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.68)';
+      ctx.fillRect(framePad, framePad, frameW, frameH);
+      ctx.strokeStyle = 'rgba(52, 88, 69, 0.24)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(framePad + 1, framePad + 1, frameW - 2, frameH - 2);
 
-      ctx.strokeStyle = '#4c97ff';
-      ctx.lineWidth = 9;
-      ctx.beginPath();
-      ctx.ellipse(w * 0.5 - drone.lateral * 12, horizon + 98 - drone.altitude * 3, 74, 28, 0, 0, Math.PI * 2);
-      ctx.stroke();
+      const glow = ctx.createRadialGradient(glowX, glowY, 12, glowX, glowY, 178);
+      glow.addColorStop(0, 'rgba(255, 204, 51, 0.56)');
+      glow.addColorStop(0.45, 'rgba(15, 140, 115, 0.22)');
+      glow.addColorStop(1, 'rgba(76, 151, 255, 0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(framePad, framePad, frameW, frameH);
 
-      ctx.fillStyle = 'rgba(25, 38, 48, 0.52)';
-      ctx.fillRect(16, 16, 182, 34);
+      ctx.strokeStyle = 'rgba(76, 151, 255, 0.42)';
+      ctx.lineWidth = 3;
+      for (let i = 0; i < 6; i += 1) {
+        const x = framePad + 52 + i * 92;
+        ctx.beginPath();
+        ctx.moveTo(x, framePad + 24);
+        ctx.lineTo(x + 90, framePad + frameH - 30);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = 'rgba(25, 38, 48, 0.58)';
+      ctx.fillRect(framePad + 18, framePad + 18, 172, 34);
       ctx.fillStyle = '#fff';
       ctx.font = '700 18px Microsoft YaHei, sans-serif';
-      ctx.fillText('DRONE-CAM MOCK', 30, 39);
+      ctx.fillText('SD IMAGE PREVIEW', framePad + 32, framePad + 41);
+
+      ctx.fillStyle = '#253542';
+      ctx.font = '800 22px Microsoft YaHei, sans-serif';
+      ctx.fillText('等待创意喷绘输出', framePad + 34, h - framePad - 48);
+      ctx.fillStyle = 'rgba(37, 53, 66, 0.62)';
+      ctx.font = '500 14px Microsoft YaHei, sans-serif';
+      ctx.fillText('这里将显示总控返回的 SD 图片', framePad + 34, h - framePad - 24);
       frame = requestAnimationFrame(draw);
     };
     draw();
@@ -63,15 +80,15 @@ const DroneStage = React.forwardRef(function DroneStage({bridge}, ref) {
   return (
     <section className="drone-stage">
       <header>
-        <h2>无人机图传</h2>
-        <span>DroneBridge mock</span>
+        <h2>SD 图片显示</h2>
+        <span>Image preview</span>
       </header>
       <canvas ref={canvasRef} width="680" height="340" />
       <div className="hud">
-        <strong>高度 {drone.altitude.toFixed(1)} m</strong>
-        <strong>距离 {drone.distance.toFixed(1)} m</strong>
-        <strong>航向 {Math.round(drone.yaw)}°</strong>
-        <strong>目标 {drone.target}</strong>
+        <strong>状态 待生成</strong>
+        <strong>尺寸 预留</strong>
+        <strong>来源 SD</strong>
+        <strong>模式 创意喷绘</strong>
       </div>
     </section>
   );
