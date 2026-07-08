@@ -1,3 +1,5 @@
+import {sendContent} from './controlBus.js';
+
 const initialDroneState = {
   connected: true,
   altitude: 1,
@@ -18,21 +20,6 @@ const directionToType = {
   '向上': 'up',
   '向下': 'down'
 };
-
-const API_BASE = import.meta.env?.VITE_API_BASE_URL || '';
-
-async function postJson(path, body) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(body)
-  });
-  if (!response.ok) {
-    const text = await response.text().catch(() => 'unknown error');
-    throw new Error(`HTTP ${response.status}: ${text}`);
-  }
-  return response.json();
-}
 
 class DroneBridgeMock {
   constructor() {
@@ -63,13 +50,17 @@ class DroneBridgeMock {
   }
 
   async sendMissionFile(missionFile) {
-    const result = await postJson('/api/drone/mission', missionFile);
+    const result = await sendContent({
+      type: 'mission',
+      source: '编程积木',
+      payload: missionFile
+    });
     this.lastMissionFile = {
       ...missionFile,
       receivedAt: new Date().toISOString(),
       route: result.udp?.target
-        ? `web-editor -> fastapi -> udp://${result.udp.target}`
-        : 'web-editor -> fastapi'
+        ? `web-editor -> vite-udp-bridge -> udp://${result.udp.target}`
+        : 'web-editor -> vite-udp-bridge'
     };
     this.state.flash = 1;
     this.notify();

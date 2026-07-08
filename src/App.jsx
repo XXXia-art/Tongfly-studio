@@ -5,12 +5,18 @@ import {sdClient} from './services/sdClient.js';
 import DroneStage from './components/DroneStage.jsx';
 import VlmChat from './components/VlmChat.jsx';
 import ScratchBlocksEditor from './components/ScratchBlocksEditor.jsx';
+import {sendMode} from './services/controlBus.js';
 
-const modeButtons = ['编程积木', '语音控制', '创意喷绘', '手势控制'];
+const modeButtons = [
+  {mode: 1, label: '编程积木', describe: '开始编程积木模型'},
+  {mode: 2, label: '语音控制', describe: '开始语音控制模型'},
+  {mode: 3, label: '创意喷绘', describe: '开始创意喷绘模型'},
+  {mode: 4, label: '手势控制', describe: '开始手势控制模型'}
+];
 
 export default function App() {
   const [moduleName, setModuleName] = useState('阶梯式飞行');
-  const [activeMode, setActiveMode] = useState(modeButtons[0]);
+  const [activeMode, setActiveMode] = useState(modeButtons[0].mode);
   const blocksEditorRef = useRef(null);
   const droneStageRef = useRef(null);
   const services = useMemo(() => ({droneBridge, vlmClient, sdClient}), []);
@@ -38,6 +44,19 @@ export default function App() {
     }
   };
 
+  const chooseMode = async option => {
+    setActiveMode(option.mode);
+    try {
+      const result = await sendMode({
+        mode: option.mode,
+        describe: option.describe
+      });
+      addLog(`模式 ${option.mode} 已发送到 ${result.udp?.target}`);
+    } catch (error) {
+      addLog(`模式发送失败：${error.message}`);
+    }
+  };
+
   return (
     <div className="scratch-app">
       <header className="scratch-topbar">
@@ -49,14 +68,14 @@ export default function App() {
           </div>
         </div>
         <nav className="mode-switcher" aria-label="功能模式">
-          {modeButtons.map(mode => (
+          {modeButtons.map(option => (
             <button
-              className={`mode-button ${activeMode === mode ? 'active' : ''}`}
-              key={mode}
+              className={`mode-button ${activeMode === option.mode ? 'active' : ''}`}
+              key={option.mode}
               type="button"
-              onClick={() => setActiveMode(mode)}
+              onClick={() => chooseMode(option)}
             >
-              {mode}
+              {option.label}
             </button>
           ))}
         </nav>

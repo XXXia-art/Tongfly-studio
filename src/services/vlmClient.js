@@ -1,39 +1,28 @@
 import {yoloTargets} from '../data/droneBlockCatalog.js';
-
-const API_BASE = import.meta.env?.VITE_API_BASE_URL || '';
-
-function cleanModelResponse(value) {
-  return String(value || '')
-    .replace(/<\|im_end\|>/g, '')
-    .replace(/<\|im_start\|>\s*assistant/g, '')
-    .trim();
-}
-
-async function postJson(path, body) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(body)
-  });
-  if (!response.ok) {
-    const text = await response.text().catch(() => 'unknown error');
-    throw new Error(`HTTP ${response.status}: ${text}`);
-  }
-  return response.json();
-}
+import {sendContent} from './controlBus.js';
 
 class VLMClient {
   async chat(text) {
-    const data = await postJson('/api/vlm/chat', {text});
-    return cleanModelResponse(data.response);
+    const result = await sendContent({
+      type: 'vlm_input',
+      source: '无人机小助手',
+      payload: {text}
+    });
+    return `已发送到总控状态机：${result.udp?.target || 'content UDP'}`;
   }
 
   async describeFrame(question, frameMeta, imageBase64) {
-    const data = await postJson('/api/vlm/describe', {
-      question,
-      image_base64: imageBase64 || undefined
+    const result = await sendContent({
+      type: 'vlm_input',
+      source: '无人机小助手',
+      payload: {
+        text: question,
+        request: 'describe_frame',
+        frameMeta,
+        image_base64: imageBase64 || undefined
+      }
     });
-    return cleanModelResponse(data.response);
+    return `看画面请求已发送到总控状态机：${result.udp?.target || 'content UDP'}`;
   }
 
   async detect(target, frameMeta) {

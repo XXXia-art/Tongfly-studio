@@ -22,20 +22,6 @@ export default function VlmChat({bridge, vlmClient, sdClient, captureFrame}) {
       message.id === id ? {...message, ...patch} : message
     )));
   };
-  const buildSdPrompt = async value => {
-    const instruction = [
-      '请把下面的中文图片描述改写成适合 Stable Diffusion v1.5 的英文提示词。',
-      '要求：只返回英文提示词，不要解释，不要 Markdown，不要中文。',
-      '风格适合少儿无人机编程软件：清晰、明亮、友好、构图干净。',
-      `中文描述：${value}`
-    ].join('\n');
-    const translated = await vlmClient.chat(instruction);
-    return translated
-      .replace(/^["'`]+|["'`]+$/g, '')
-      .replace(/^English prompt:\s*/i, '')
-      .trim() || value;
-  };
-
   const send = async event => {
     event?.preventDefault?.();
     const value = text.trim();
@@ -46,14 +32,12 @@ export default function VlmChat({bridge, vlmClient, sdClient, captureFrame}) {
     if (activeSkill === 'image') {
       setActiveSkill(null);
       addMessage({role: 'user', text: value, skill: '创建图片'});
-      addMessage({id: pendingId, role: 'assistant', text: '正在理解描述并生成图片', loading: true});
+      addMessage({id: pendingId, role: 'assistant', text: '正在发送到总控状态机', loading: true});
       setIsThinking(true);
       try {
-        const sdPrompt = await buildSdPrompt(value);
-        const image = await sdClient.createImage(sdPrompt);
-        updateMessage(pendingId, {text: `已生成图片：${value}`, image, loading: false});
+        updateMessage(pendingId, {text: await vlmClient.chat(`创建图片：${value}`), loading: false});
       } catch (error) {
-        updateMessage(pendingId, {text: `图片生成失败：${error.message}`, error: true, loading: false});
+        updateMessage(pendingId, {text: `发送失败：${error.message}`, error: true, loading: false});
       } finally {
         setIsThinking(false);
       }
@@ -61,12 +45,12 @@ export default function VlmChat({bridge, vlmClient, sdClient, captureFrame}) {
     }
 
     addMessage({role: 'user', text: value});
-    addMessage({id: pendingId, role: 'assistant', text: '正在思考', loading: true});
+    addMessage({id: pendingId, role: 'assistant', text: '正在发送到总控状态机', loading: true});
     setIsThinking(true);
     try {
       updateMessage(pendingId, {text: await vlmClient.chat(value), loading: false});
     } catch (error) {
-      updateMessage(pendingId, {text: `回答失败：${error.message}`, error: true, loading: false});
+      updateMessage(pendingId, {text: `发送失败：${error.message}`, error: true, loading: false});
     } finally {
       setIsThinking(false);
     }
