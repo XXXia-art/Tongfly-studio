@@ -114,6 +114,16 @@ export default function VlmChat({bridge, vlmClient, sdClient, captureFrame}) {
           >
             +
           </button>
+          <button
+            className="skill-action vision-skill"
+            type="button"
+            onClick={askVision}
+            disabled={isThinking}
+            aria-label="看画面"
+            title="看画面"
+          >
+            看画面
+          </button>
           {activeSkill === 'image' && (
             <span className="skill-chip">
               <span>创建图片</span>
@@ -126,8 +136,15 @@ export default function VlmChat({bridge, vlmClient, sdClient, captureFrame}) {
             disabled={isThinking}
             placeholder={activeSkill === 'image' ? '描述你想生成的图片' : '问小助手，或选择技能'}
           />
-          <button className="vision-button" type="button" onClick={askVision} disabled={isThinking}>看画面</button>
-          <button className="send-button" type="submit" disabled={isThinking || !text.trim()} aria-label="发送">↑</button>
+          <button
+            className="send-button"
+            type="submit"
+            onClick={send}
+            disabled={isThinking || !text.trim()}
+            aria-label="发送"
+          >
+            ↑
+          </button>
         </div>
       </form>
     </section>

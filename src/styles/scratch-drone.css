@@ -757,6 +757,8 @@ button {
 
 .chat-composer button {
   flex: 0 0 auto;
+  position: relative;
+  z-index: 1;
 }
 
 .skill-toggle,
@@ -775,6 +777,23 @@ button {
 .skill-toggle.active {
   color: #2f6fe5;
   background: #e7f0ff;
+}
+
+.skill-action {
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.vision-skill {
+  color: #fff;
+  background: #0f8c73;
 }
 
 .skill-chip {
@@ -802,20 +821,15 @@ button {
   line-height: 1;
 }
 
-.vision-button {
-  height: 34px;
-  padding: 0 10px;
-  border-radius: 999px;
-  color: #fff;
-  background: #0f8c73;
-  font-weight: 800;
-}
-
 .send-button {
+  flex-basis: 42px !important;
+  width: 42px;
+  height: 42px;
   color: #fff;
   background: #111;
   font-size: 22px;
   font-weight: 900;
+  z-index: 2;
 }
 
 .chat-composer button:disabled,
