@@ -48,15 +48,344 @@ npm run dev -- --host 0.0.0.0
 }
 ```
 
-总控返回 VLM 文本时：
+总控返回 VLM 文本时，建议带上 `mode` 区分回复来源：
 
 ```json
 {
   "type": "vlm_result",
+  "mode": 6,
+  "describe": "VLM对话回复",
+  "payload": {
+    "text": "模型回复内容"
+  }
+}
+```
+
+## 通信协议与指令格式
+
+浏览器不能直接收发 UDP，所以通信链路是：
+
+```text
+浏览器前端 -> HTTP -> Vite UDP 桥 -> UDP -> 总控状态机
+总控状态机 -> UDP -> Vite UDP 桥 -> HTTP 轮询 -> 浏览器前端
+```
+
+### 端口约定
+
+| 方向 | UDP 端口 | 用途 |
+| --- | --- | --- |
+| 前端 -> 总控 | `127.0.0.1:9100` | mode 模式/动作指令 |
+| 前端 -> 总控 | `127.0.0.1:9200` | content 内容数据 |
+| 总控 -> 前端 | `127.0.0.1:9300` | output 模型/总控返回结果 |
+
+前端内部 HTTP 接口：
+
+| HTTP 接口 | 作用 |
+| --- | --- |
+| `POST /bridge/mode` | 转发到 UDP `9100` |
+| `POST /bridge/content` | 转发到 UDP `9200` |
+| `GET /bridge/output` | 前端轮询读取总控返回 |
+| `GET /bridge/output-image?path=...` | 把 RK3588 本地图片路径映射成浏览器可访问图片 |
+
+### 前端发送包通用格式
+
+前端发给总控的 UDP 包统一使用 `mode + describe`，不再使用顶层 `type` 字段：
+
+```json
+{
+  "mode": 1,
+  "describe": "编程积木编译结果",
+  "payload": {},
+  "sentAt": "2026-07-08T12:00:00.000Z"
+}
+```
+
+字段说明：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `mode` | number | 指令/模式编号 |
+| `describe` | string | 动作说明，也是总控分流标志之一 |
+| `payload` | object | 具体内容数据，可选 |
+| `sentAt` | string | 前端发送时间 |
+
+### UDP 9100: mode 指令
+
+| mode | describe | 触发位置 | 说明 |
+| --- | --- | --- | --- |
+| `0` | `重置飞控` | 顶部 `重置飞控` 按钮 | 通知总控重置飞控状态 |
+| `1` | `开始编程积木模型` | 顶部 `编程积木` 按钮 | 进入积木编程模式 |
+| `2` | `语音掌控飞行` | 选择 `掌控飞行` 后点击麦克风 | 启动语音控飞流程 |
+| `3` | `开始创意喷绘模型` | 顶部 `创意喷绘` 按钮 | 进入创意喷绘模式 |
+| `3` | `语音SD生成图片` | 选择 `创建图片` 后点击麦克风 | 启动语音 SD 生成图片流程 |
+| `4` | `开始手势控制模型` | 顶部 `手势控制` 按钮 | 进入手势控制模式 |
+| `5` | `查看画面` | `+` 技能菜单点击 `查看画面` | 通知总控执行图像理解/查看画面 |
+| `6` | `VLM对话` | 右下角输入框直接点击发送 | 用户和 VLM 普通对话 |
+
+示例：
+
+```json
+{
+  "mode": 2,
+  "describe": "语音掌控飞行",
+  "sentAt": "2026-07-08T12:00:00.000Z"
+}
+```
+
+```json
+{
+  "mode": 3,
+  "describe": "语音SD生成图片",
+  "sentAt": "2026-07-08T12:00:00.000Z"
+}
+```
+
+### UDP 9200: content 内容包
+
+#### 编程积木编译结果
+
+点击积木区 `运行` 后发送。总控真正执行飞行时，优先读取 `payload.flightActions`。
+
+`flightActions` 是运动学速度指令数组：
+
+| 字段 | 单位 | 说明 |
+| --- | --- | --- |
+| `vx` | m/s | 前后方向速度，正数向前，负数向后 |
+| `vy` | m/s | 左右方向速度，正数向右，负数向左 |
+| `vz` | m/s | 上下方向速度，正数向上，负数向下 |
+| `yaw_rate` | deg/s | 偏航角速度，正数顺时针，负数逆时针 |
+| `duration` | s | 动作持续时间 |
+
+```json
+{
+  "mode": 1,
+  "describe": "编程积木编译结果",
+  "payload": {
+    "format": "TongfeiDroneMission",
+    "version": 1,
+    "id": "tdm-xxx",
+    "createdAt": "2026-07-08T12:00:00.000Z",
+    "target": {
+      "onboard": "edge-chip",
+      "downstream": "flight-controller"
+    },
+    "safety": {
+      "maxForeverIterations": 6,
+      "requiresAck": true
+    },
+    "programs": [],
+    "source": {
+      "type": "scratch-blocks-xml",
+      "xml": "<xml>...</xml>"
+    },
+    "flightActions": [
+      {
+        "vx": 1,
+        "vy": 0,
+        "vz": 0,
+        "yaw_rate": 0,
+        "duration": 2
+      },
+      {
+        "vx": 0,
+        "vy": 0,
+        "vz": 0.6,
+        "yaw_rate": 0,
+        "duration": 1
+      },
+      {
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "yaw_rate": 30,
+        "duration": 1
+      }
+    ],
+    "checksum": "sum32:xxxxxxxx"
+  },
+  "sentAt": "2026-07-08T12:00:00.000Z"
+}
+```
+
+常见积木映射：
+
+| 积木动作 | 生成结果 |
+| --- | --- |
+| 向前，速度 `s`，时间 `t` | `{vx: s, vy: 0, vz: 0, yaw_rate: 0, duration: t}` |
+| 向后，速度 `s`，时间 `t` | `{vx: -s, vy: 0, vz: 0, yaw_rate: 0, duration: t}` |
+| 向左，速度 `s`，时间 `t` | `{vx: 0, vy: -s, vz: 0, yaw_rate: 0, duration: t}` |
+| 向右，速度 `s`，时间 `t` | `{vx: 0, vy: s, vz: 0, yaw_rate: 0, duration: t}` |
+| 向上，速度 `s`，时间 `t` | `{vx: 0, vy: 0, vz: s, yaw_rate: 0, duration: t}` |
+| 向下，速度 `s`，时间 `t` | `{vx: 0, vy: 0, vz: -s, yaw_rate: 0, duration: t}` |
+| 顺时针转向，时间 `t` | `{vx: 0, vy: 0, vz: 0, yaw_rate: 30, duration: t}` |
+| 逆时针转向，时间 `t` | `{vx: 0, vy: 0, vz: 0, yaw_rate: -30, duration: t}` |
+| 悬停/等待，时间 `t` | `{vx: 0, vy: 0, vz: 0, yaw_rate: 0, duration: t}` |
+
+#### 文本掌控飞行
+
+触发：`+` 选择 `掌控飞行`，输入文字后点击发送。
+
+```json
+{
+  "mode": 2,
+  "describe": "文本掌控飞行",
+  "payload": {
+    "text": "向前飞两米然后左转"
+  },
+  "sentAt": "2026-07-08T12:00:00.000Z"
+}
+```
+
+#### VLM 对话
+
+触发：右下角输入框直接输入文字并点击发送，不选择 `创建图片` 或 `掌控飞行`。
+
+```json
+{
+  "mode": 6,
+  "describe": "VLM对话",
+  "payload": {
+    "text": "请介绍一下当前任务状态"
+  },
+  "sentAt": "2026-07-08T12:00:00.000Z"
+}
+```
+
+#### 文本 SD 生成图片
+
+```json
+{
+  "mode": 3,
+  "describe": "文本SD生成图片",
+  "payload": {
+    "prompt": "一架红色无人机在天空中飞行"
+  },
+  "sentAt": "2026-07-08T12:00:00.000Z"
+}
+```
+
+#### 查看画面内容
+
+当前 `查看画面` 主要走 UDP `9100` 的 mode 指令：
+
+```json
+{
+  "mode": 5,
+  "describe": "查看画面",
+  "sentAt": "2026-07-08T12:00:00.000Z"
+}
+```
+
+若后续要把截图或画面元信息一起传给总控，可使用 UDP `9200`：
+
+```json
+{
+  "mode": 5,
+  "describe": "查看画面内容",
+  "payload": {
+    "text": "请查看当前画面",
+    "frameMeta": {},
+    "image_base64": "data:image/png;base64,..."
+  },
+  "sentAt": "2026-07-08T12:00:00.000Z"
+}
+```
+
+### UDP 9300: 总控返回前端
+
+总控把结果发送到 UDP `127.0.0.1:9300`。Vite 缓存消息，前端通过 `/bridge/output` 轮询读取。
+
+当前返回包使用顶层 `type` 决定前端显示位置，VLM 返回再用 `mode` 区分回复来源：
+
+| type | 前端显示位置 |
+| --- | --- |
+| `sd_result` | 右上角 SD 图片显示区 |
+| `vlm_result` | 右下角聊天区，结合 `mode` 区分查看画面/普通对话/控飞解析 |
+
+SD 图片返回推荐格式：
+
+```json
+{
+  "type": "sd_result",
+  "payload": {
+    "asr_text": "画一架红色无人机在天空中飞行",
+    "prompt_en": "A red drone flying in the sky",
+    "image_path": "/home/elf/Tongfly-output/images/sd_001.png"
+  }
+}
+```
+
+VLM 普通文本对话返回：
+
+```json
+{
+  "type": "vlm_result",
+  "mode": 6,
+  "describe": "VLM对话回复",
+  "payload": {
+    "text": "模型回复内容"
+  }
+}
+```
+
+查看画面返回：
+
+```json
+{
+  "type": "vlm_result",
+  "mode": 5,
+  "describe": "查看画面回复",
   "payload": {
     "text": "我看到了前方有障碍物"
   }
 }
+```
+
+飞行指令解析结果也可以先用 `vlm_result` 返回给前端显示：
+
+```json
+{
+  "type": "vlm_result",
+  "mode": 2,
+  "describe": "文本掌控飞行解析结果",
+  "payload": {
+    "text": "已解析为：向前 2 米，然后左转 90 度",
+    "commands": [
+      {
+        "action": "forward",
+        "distance": 2,
+        "unit": "m"
+      }
+    ]
+  }
+}
+```
+
+### 总控侧处理建议
+
+```text
+监听 9100:
+  mode=0 -> 重置飞控
+  mode=1 -> 编程积木模式
+  mode=2 + describe=语音掌控飞行 -> 语音控飞
+  mode=3 + describe=开始创意喷绘模型 -> 创意喷绘模式
+  mode=3 + describe=语音SD生成图片 -> 语音 SD 生成
+  mode=4 -> 手势控制
+  mode=5 -> 查看画面
+  mode=6 -> VLM 普通对话
+
+监听 9200:
+  mode=1 + describe=编程积木编译结果 -> 读取 payload.flightActions 并执行 vx/vy/vz/yaw_rate/duration
+  mode=2 + describe=文本掌控飞行 -> 文本控飞/VLM 解析
+  mode=3 + describe=文本SD生成图片 -> 文本 SD 生成
+  mode=5 + describe=查看画面内容 -> 图像理解
+  mode=6 + describe=VLM对话 -> 普通 VLM 对话
+
+返回 9300:
+  type=sd_result -> 前端显示图片
+  type=vlm_result + mode=5 -> 前端显示查看画面回复
+  type=vlm_result + mode=6 -> 前端显示 VLM 对话回复
+  type=vlm_result + mode=2 -> 前端显示控飞解析回复
 ```
 
 旧的 FastAPI 后端、VLM/SD 模型调用代码已经归档到：

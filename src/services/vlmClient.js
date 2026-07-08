@@ -2,10 +2,11 @@ import {yoloTargets} from '../data/droneBlockCatalog.js';
 import {sendContent} from './controlBus.js';
 
 class VLMClient {
-  async chat(text) {
+  async chat(text, options = {}) {
+    const {mode = 6, describe = 'VLM对话'} = options;
     const result = await sendContent({
-      mode: 2,
-      describe: '文本掌控飞行',
+      mode,
+      describe,
       payload: {text}
     });
     return `已发送到总控状态机：${result.udp?.target || 'content UDP'}`;

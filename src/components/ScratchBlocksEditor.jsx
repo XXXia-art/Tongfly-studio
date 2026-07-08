@@ -870,8 +870,8 @@ function compileStepToFlightActions(step) {
   if (step.opcode === 'right') return [flightAction({vy: speed, duration: seconds})];
   if (step.opcode === 'up') return [flightAction({vz: speed, duration: seconds})];
   if (step.opcode === 'down') return [flightAction({vz: -speed, duration: seconds})];
-  if (step.opcode === 'turn') return [flightAction({yaw: 30, duration: seconds})];
-  if (step.opcode === 'turn_left') return [flightAction({yaw: -30, duration: seconds})];
+  if (step.opcode === 'turn') return [flightAction({yaw_rate: 30, duration: seconds})];
+  if (step.opcode === 'turn_left') return [flightAction({yaw_rate: -30, duration: seconds})];
   if (step.opcode === 'hover' || step.opcode === 'wait') {
     return [flightAction({duration: seconds})];
   }
@@ -939,7 +939,7 @@ function flightAction(overrides = {}) {
     vx: 0.0,
     vy: 0.0,
     vz: 0.0,
-    yaw: 0,
+    yaw_rate: 0,
     duration: 3,
     ...overrides
   };

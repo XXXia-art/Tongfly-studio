@@ -7,6 +7,12 @@ const createMessageId = () => {
   return `message-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
 
+const outputSkillLabel = message => {
+  if (message.mode === 5) return '查看画面';
+  if (message.mode === 6) return 'VLM对话';
+  return message.describe || '模型回复';
+};
+
 export default function VlmChat({
   bridge,
   vlmClient,
@@ -34,6 +40,7 @@ export default function VlmChat({
       ...incoming.map(message => ({
         id: `output-${message.id}`,
         role: 'assistant',
+        skill: outputSkillLabel(message),
         text: message.payload?.text || message.payload?.answer || JSON.stringify(message.payload ?? message)
       }))
     ]);
@@ -73,7 +80,10 @@ export default function VlmChat({
       addMessage({id: pendingId, role: 'assistant', text: '正在发送到总控状态机', loading: true});
       setIsThinking(true);
       try {
-        updateMessage(pendingId, {text: await vlmClient.chat(`掌控飞行：${value}`), loading: false});
+        updateMessage(pendingId, {
+          text: await vlmClient.chat(value, {mode: 2, describe: '文本掌控飞行'}),
+          loading: false
+        });
       } catch (error) {
         updateMessage(pendingId, {text: `发送失败：${error.message}`, error: true, loading: false});
       } finally {
@@ -86,7 +96,10 @@ export default function VlmChat({
     addMessage({id: pendingId, role: 'assistant', text: '正在发送到总控状态机', loading: true});
     setIsThinking(true);
     try {
-      updateMessage(pendingId, {text: await vlmClient.chat(value), loading: false});
+      updateMessage(pendingId, {
+        text: await vlmClient.chat(value, {mode: 6, describe: 'VLM对话'}),
+        loading: false
+      });
     } catch (error) {
       updateMessage(pendingId, {text: `发送失败：${error.message}`, error: true, loading: false});
     } finally {
