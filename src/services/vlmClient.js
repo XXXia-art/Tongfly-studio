@@ -2,6 +2,13 @@ import {yoloTargets} from '../data/droneBlockCatalog.js';
 
 const API_BASE = import.meta.env?.VITE_API_BASE_URL || '';
 
+function cleanModelResponse(value) {
+  return String(value || '')
+    .replace(/<\|im_end\|>/g, '')
+    .replace(/<\|im_start\|>\s*assistant/g, '')
+    .trim();
+}
+
 async function postJson(path, body) {
   const response = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
@@ -18,7 +25,7 @@ async function postJson(path, body) {
 class VLMClient {
   async chat(text) {
     const data = await postJson('/api/vlm/chat', {text});
-    return data.response;
+    return cleanModelResponse(data.response);
   }
 
   async describeFrame(question, frameMeta, imageBase64) {
@@ -26,7 +33,7 @@ class VLMClient {
       question,
       image_base64: imageBase64 || undefined
     });
-    return data.response;
+    return cleanModelResponse(data.response);
   }
 
   async detect(target, frameMeta) {

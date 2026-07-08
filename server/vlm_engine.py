@@ -226,7 +226,7 @@ class LLMEngine:
         self.param.mirostat = 0
         self.param.mirostat_tau = 5.0
         self.param.mirostat_eta = 0.1
-        self.param.skip_special_token = False
+        self.param.skip_special_token = True
         self.param.is_async = False
         self.param.img_start = IMG_START
         self.param.img_end = IMG_END
