@@ -30,11 +30,12 @@ export default function VlmChat({bridge, vlmClient, sdClient, captureFrame}) {
   };
 
   const send = async event => {
-    event.preventDefault();
+    event?.preventDefault?.();
     const value = text.trim();
     if (!value || isThinking) return;
     const pendingId = crypto.randomUUID();
     setText('');
+    setIsSkillMenuOpen(false);
     if (activeSkill === 'image') {
       setActiveSkill(null);
       addMessage({role: 'user', text: value, skill: '创建图片'});
@@ -153,7 +154,6 @@ export default function VlmChat({bridge, vlmClient, sdClient, captureFrame}) {
           <button
             className="send-button"
             type="submit"
-            onClick={send}
             disabled={isThinking || !text.trim()}
             aria-label="发送"
           >
