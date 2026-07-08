@@ -19,6 +19,11 @@ const modeButtons = [
   {mode: 5, label: '手势识别', describe: '开始手势识别模型'}
 ];
 
+const flightControlButtons = [
+  {mode: 8, label: '起飞'},
+  {mode: 9, label: '降落'}
+];
+
 export default function App() {
   const [moduleName, setModuleName] = useState('阶梯式飞行');
   const [activeMode, setActiveMode] = useState(modeButtons[0].mode);
@@ -110,6 +115,18 @@ export default function App() {
     }
   };
 
+  const sendFlightControlMode = async option => {
+    setActiveMode(option.mode);
+    try {
+      const result = await sendMode({
+        mode: option.mode
+      });
+      addLog(`${option.label}已发送到 ${result.udp?.target}`);
+    } catch (error) {
+      addLog(`${option.label}发送失败：${error.message}`);
+    }
+  };
+
   const sendModeAction = async ({mode = 2, describe = '掌控飞行'} = {}) => {
     setActiveMode(mode);
     try {
@@ -145,6 +162,18 @@ export default function App() {
             </button>
           ))}
         </nav>
+        <div className="flight-control-actions" aria-label="飞控快捷操作">
+          {flightControlButtons.map(option => (
+            <button
+              className="flight-control-button"
+              key={option.mode}
+              type="button"
+              onClick={() => sendFlightControlMode(option)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
         <button className="reset-control-button" type="button" onClick={resetFlightControl}>
           重置飞控
         </button>

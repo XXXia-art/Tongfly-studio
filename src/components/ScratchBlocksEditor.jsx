@@ -121,6 +121,7 @@ const ScratchBlocksEditor = forwardRef(function ScratchBlocksEditor({services, o
   const hostRef = useRef(null);
   const workspaceRef = useRef(null);
   const cleanupToolboxCategoriesRef = useRef(() => {});
+  const renderFixFrameRef = useRef(null);
 
   useImperativeHandle(ref, () => ({
     runProgram: async () => {
@@ -164,17 +165,42 @@ const ScratchBlocksEditor = forwardRef(function ScratchBlocksEditor({services, o
       }
     });
 
+    const scheduleRenderFix = () => {
+      if (renderFixFrameRef.current) {
+        cancelAnimationFrame(renderFixFrameRef.current);
+      }
+      renderFixFrameRef.current = requestAnimationFrame(() => {
+        stabilizeBlocklySvg(hostRef.current);
+        renderFixFrameRef.current = requestAnimationFrame(() => {
+          stabilizeBlocklySvg(hostRef.current);
+          renderFixFrameRef.current = null;
+        });
+      });
+    };
+
     workspaceRef.current = workspace;
     loadStarterWorkspace(workspace);
+    scheduleRenderFix();
     requestAnimationFrame(() => {
       ScratchBlocks.svgResize(workspace);
       cleanupToolboxCategoriesRef.current = decorateToolboxCategories(hostRef.current);
+      scheduleRenderFix();
     });
 
-    const resizeObserver = new ResizeObserver(() => ScratchBlocks.svgResize(workspace));
+    const resizeObserver = new ResizeObserver(() => {
+      ScratchBlocks.svgResize(workspace);
+      scheduleRenderFix();
+    });
     resizeObserver.observe(hostRef.current);
+    const handleWorkspaceChanged = () => scheduleRenderFix();
+    workspace.addChangeListener(handleWorkspaceChanged);
+    const renderingEvents = ['wheel', 'pointerup', 'mouseup', 'touchend'];
+    renderingEvents.forEach(eventName => {
+      hostRef.current.addEventListener(eventName, scheduleRenderFix, {passive: true});
+    });
     const handleModulesChanged = event => {
       refreshToolbox(workspace, hostRef.current, cleanupToolboxCategoriesRef);
+      scheduleRenderFix();
       if (event.detail?.deletedModule) {
         onLog?.(`模块「${event.detail.deletedModule}」已删除。`);
       }
@@ -183,6 +209,14 @@ const ScratchBlocksEditor = forwardRef(function ScratchBlocksEditor({services, o
 
     return () => {
       window.removeEventListener('drone-modules-changed', handleModulesChanged);
+      renderingEvents.forEach(eventName => {
+        hostRef.current?.removeEventListener(eventName, scheduleRenderFix);
+      });
+      workspace.removeChangeListener(handleWorkspaceChanged);
+      if (renderFixFrameRef.current) {
+        cancelAnimationFrame(renderFixFrameRef.current);
+        renderFixFrameRef.current = null;
+      }
       cleanupToolboxCategoriesRef.current();
       resizeObserver.disconnect();
       workspace.dispose();
@@ -192,6 +226,49 @@ const ScratchBlocksEditor = forwardRef(function ScratchBlocksEditor({services, o
 
   return <div className="scratch-blocks-host" ref={hostRef} />;
 });
+
+function stabilizeBlocklySvg(host) {
+  if (!host) return;
+
+  host.querySelectorAll(
+    '.blocklyBlockCanvas .blocklyDraggable, .blocklyFlyout .blocklyDraggable'
+  ).forEach(element => {
+    element.style.opacity = '1';
+    element.style.filter = 'none';
+    element.style.mixBlendMode = 'normal';
+  });
+
+  host.querySelectorAll(
+    '.blocklyPath, .blocklyPathLight, .blocklyPathDark, .blocklyPathOutline, .blocklyPathSelected, .blocklyFieldRect, .blocklyEditableText > rect, .blocklyNonEditableText > rect'
+  ).forEach(element => {
+    element.style.fillOpacity = '1';
+    element.style.strokeOpacity = '1';
+    element.style.filter = 'none';
+    element.style.mixBlendMode = 'normal';
+  });
+
+  host.querySelectorAll(
+    '.blocklyText, .blocklyText tspan'
+  ).forEach(element => {
+    element.style.opacity = '1';
+    element.style.fillOpacity = '1';
+    element.style.strokeOpacity = '1';
+    element.style.filter = 'none';
+    element.style.mixBlendMode = 'normal';
+    element.style.fill = '#FFFFFF';
+  });
+
+  host.querySelectorAll(
+    '.blocklyEditableText text, .blocklyEditableText tspan, .blocklyNonEditableText text, .blocklyNonEditableText tspan, .blocklyFlyoutLabelText'
+  ).forEach(element => {
+    element.style.opacity = '1';
+    element.style.fillOpacity = '1';
+    element.style.strokeOpacity = '1';
+    element.style.filter = 'none';
+    element.style.mixBlendMode = 'normal';
+    element.style.fill = '#575E75';
+  });
+}
 
 function refreshToolbox(workspace, host, cleanupRef) {
   if (!workspace) return;

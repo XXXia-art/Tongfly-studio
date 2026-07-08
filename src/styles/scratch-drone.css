@@ -124,6 +124,32 @@ button {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 4px 10px rgba(15, 140, 115, 0.22);
 }
 
+.flight-control-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.flight-control-button {
+  height: 38px;
+  padding: 0 15px;
+  border: 1px solid #8fb9aa;
+  border-radius: 8px;
+  color: #0d5f50;
+  background: linear-gradient(180deg, #f6fffb 0%, #d9eee7 100%);
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 2px 6px rgba(13, 95, 80, 0.12);
+}
+
+.flight-control-button:hover {
+  border-color: #0f8c73;
+  color: #084d40;
+  background: linear-gradient(180deg, #ffffff 0%, #c5e6db 100%);
+}
+
 .run-button {
   height: 38px;
   padding: 0 18px;
@@ -511,6 +537,25 @@ button {
   filter: none !important;
   mix-blend-mode: normal !important;
   text-rendering: geometricPrecision;
+}
+
+.scratch-blocks-host .blocklyText,
+.scratch-blocks-host .blocklyText tspan {
+  fill: #fff !important;
+}
+
+.scratch-blocks-host .blocklyEditableText > rect,
+.scratch-blocks-host .blocklyNonEditableText > rect,
+.scratch-blocks-host .blocklyFieldRect {
+  fill: #fff !important;
+}
+
+.scratch-blocks-host .blocklyEditableText text,
+.scratch-blocks-host .blocklyEditableText tspan,
+.scratch-blocks-host .blocklyNonEditableText text,
+.scratch-blocks-host .blocklyNonEditableText tspan,
+.scratch-blocks-host .blocklyFlyoutLabelText {
+  fill: #575e75 !important;
 }
 
 .scratch-blocks-host .blocklyToolboxDiv {
