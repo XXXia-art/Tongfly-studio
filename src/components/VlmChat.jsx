@@ -1,5 +1,12 @@
 import React, {useState} from 'react';
 
+const createMessageId = () => {
+  if (globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+  return `message-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
 export default function VlmChat({bridge, vlmClient, sdClient, captureFrame}) {
   const [text, setText] = useState('');
   const [activeSkill, setActiveSkill] = useState(null);
@@ -33,7 +40,7 @@ export default function VlmChat({bridge, vlmClient, sdClient, captureFrame}) {
     event?.preventDefault?.();
     const value = text.trim();
     if (!value || isThinking) return;
-    const pendingId = crypto.randomUUID();
+    const pendingId = createMessageId();
     setText('');
     setIsSkillMenuOpen(false);
     if (activeSkill === 'image') {
@@ -68,7 +75,7 @@ export default function VlmChat({bridge, vlmClient, sdClient, captureFrame}) {
   const askVision = async () => {
     if (isThinking) return;
     const question = text.trim() || '请帮我看一下当前画面';
-    const pendingId = crypto.randomUUID();
+    const pendingId = createMessageId();
     setText('');
     addMessage({role: 'user', text: `看画面：${question}`});
     addMessage({id: pendingId, role: 'assistant', text: '正在看画面', loading: true});
