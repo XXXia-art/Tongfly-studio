@@ -32,7 +32,7 @@ export const blockCatalog = {
         color: direction.color,
         icon: direction.icon,
         text: `${direction.label} [speed] 米/秒 [seconds] 秒`,
-        defaults: {speed: direction.type === 'up' || direction.type === 'down' ? 0.6 : 1, seconds: direction.type === 'up' || direction.type === 'down' ? 1.5 : 2}
+        defaults: {speed: 0.15, seconds: direction.type === 'up' || direction.type === 'down' ? 1.5 : 2}
       })),
       {
         id: 'turn',
@@ -112,9 +112,9 @@ export const blockCatalog = {
 };
 
 export const starterProgram = [
-  {id: 'forward', params: {speed: 1, seconds: 2}},
-  {id: 'up', params: {speed: 0.6, seconds: 1.5}},
-  {id: 'forward', params: {speed: 1, seconds: 2}},
-  {id: 'up', params: {speed: 0.6, seconds: 1.5}},
+  {id: 'forward', params: {speed: 0.15, seconds: 2}},
+  {id: 'up', params: {speed: 0.15, seconds: 1.5}},
+  {id: 'forward', params: {speed: 0.15, seconds: 2}},
+  {id: 'up', params: {speed: 0.15, seconds: 1.5}},
   {id: 'askVision', params: {question: '我现在飞到哪里了？'}}
 ];

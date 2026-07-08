@@ -102,12 +102,12 @@ const blockTypes = {
 };
 
 const flightBlocks = [
-  [blockTypes.forward, '向前', 'forward', 1, 2, '米/秒'],
-  [blockTypes.backward, '向后', 'backward', 1, 2, '米/秒'],
-  [blockTypes.left, '向左', 'left', 1, 1, '米/秒'],
-  [blockTypes.right, '向右', 'right', 1, 1, '米/秒'],
-  [blockTypes.up, '向上', 'up', 0.6, 1.5, '米/秒'],
-  [blockTypes.down, '向下', 'down', 0.6, 1.5, '米/秒']
+  [blockTypes.forward, '向前', 'forward', 0.15, 2, '米/秒'],
+  [blockTypes.backward, '向后', 'backward', 0.15, 2, '米/秒'],
+  [blockTypes.left, '向左', 'left', 0.15, 1, '米/秒'],
+  [blockTypes.right, '向右', 'right', 0.15, 1, '米/秒'],
+  [blockTypes.up, '向上', 'up', 0.15, 1.5, '米/秒'],
+  [blockTypes.down, '向下', 'down', 0.15, 1.5, '米/秒']
 ];
 
 const directions = ['左', '中', '右'];
@@ -762,18 +762,18 @@ function loadStarterWorkspace(workspace) {
   workspace.clear();
   const starterXml = `<xml xmlns="https://developers.google.com/blockly/xml">
     <block type="${blockTypes.forward}" x="52" y="44">
-      ${numberValue('SPEED', 1)}
+      ${numberValue('SPEED', 0.15)}
       ${numberValue('SECONDS', 2)}
       <next>
         <block type="control_repeat">
           ${numberValue('TIMES', 3)}
           <statement name="SUBSTACK">
             <block type="${blockTypes.up}">
-              ${numberValue('SPEED', 0.6)}
+              ${numberValue('SPEED', 0.15)}
               ${numberValue('SECONDS', 1)}
               <next>
                 <block type="${blockTypes.forward}">
-                  ${numberValue('SPEED', 1)}
+                  ${numberValue('SPEED', 0.15)}
                   ${numberValue('SECONDS', 1.5)}
                 </block>
               </next>
@@ -1192,7 +1192,7 @@ async function runBlock(block, services, onLog) {
   const flight = flightBlocks.find(([blockType]) => blockType === type);
   if (flight) {
     const [, label, commandType] = flight;
-    const speed = await readNumberInput(block, 'SPEED', services, 1);
+    const speed = await readNumberInput(block, 'SPEED', services, 0.15);
     const seconds = await readNumberInput(block, 'SECONDS', services, 1);
     onLog?.(`${label}：速度 ${speed}，时间 ${seconds} 秒`);
     await services.droneBridge.runCommand({type: commandType, speed, seconds});
@@ -1321,7 +1321,7 @@ async function runBlock(block, services, onLog) {
   }
 
   if (type === blockTypes.setMaxSpeed) {
-    const speed = await readNumberInput(block, 'SPEED', services, 1);
+    const speed = await readNumberInput(block, 'SPEED', services, 0.15);
     onLog?.(`设置最大速度：${speed} 米/秒`);
     return;
   }

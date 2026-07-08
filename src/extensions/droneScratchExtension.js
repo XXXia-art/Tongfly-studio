@@ -41,7 +41,7 @@ class DroneScratchExtension {
           text: '[DIRECTION] 速度 [SPEED] 米/秒 时间 [SECONDS] 秒',
           arguments: {
             DIRECTION: {type: ArgumentType.STRING, menu: 'directions', defaultValue: '向前'},
-            SPEED: {type: ArgumentType.NUMBER, defaultValue: 1},
+            SPEED: {type: ArgumentType.NUMBER, defaultValue: 0.15},
             SECONDS: {type: ArgumentType.NUMBER, defaultValue: 2}
           }
         },
