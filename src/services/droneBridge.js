@@ -52,7 +52,7 @@ class DroneBridgeMock {
   async sendMissionFile(missionFile) {
     const result = await sendContent({
       mode: 1,
-      flightActions: missionFile.flightActions || []
+      text: missionFile.flightActions || []
     });
     this.lastMissionFile = {
       ...missionFile,

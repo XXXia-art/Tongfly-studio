@@ -133,9 +133,9 @@ npm run dev -- --host 0.0.0.0
 
 #### 编程积木编译结果
 
-点击积木区 `运行` 后发送。总控真正执行飞行时，直接读取顶层 `flightActions`。
+点击积木区 `运行` 后发送。总控真正执行飞行时，直接读取顶层 `text`，其中 `text` 是运动学速度指令数组。
 
-`flightActions` 是运动学速度指令数组：
+`text` 数组中每一项包含：
 
 | 字段 | 单位 | 说明 |
 | --- | --- | --- |
@@ -148,7 +148,7 @@ npm run dev -- --host 0.0.0.0
 ```json
 {
   "mode": 1,
-  "flightActions": [
+  "text": [
     {
       "vx": 1,
       "vy": 0,
@@ -195,7 +195,7 @@ npm run dev -- --host 0.0.0.0
 ```json
 {
   "mode": 6,
-  "test": "请查看当前画面"
+  "text": "请查看当前画面"
 }
 ```
 
@@ -266,8 +266,8 @@ VLM 普通文本对话返回：
   mode=7 -> VLM 普通对话模式
 
 监听 9200:
-  mode=1 -> 读取 flightActions 并执行 vx/vy/vz/yaw_rate/duration
-  mode=6 -> 读取 test，执行图像理解
+  mode=1 -> 读取 text 数组并执行 vx/vy/vz/yaw_rate/duration
+  mode=6 -> 读取 text，执行图像理解
   mode=7 -> 读取 text，执行普通 VLM 对话
 
 返回 9300:

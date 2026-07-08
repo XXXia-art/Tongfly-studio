@@ -14,7 +14,7 @@ class VLMClient {
   async describeFrame(question, frameMeta, imageBase64) {
     const result = await sendContent({
       mode: 6,
-      test: question
+      text: question
     });
     return `看画面请求已发送到总控状态机：${result.udp?.target || 'content UDP'}`;
   }
