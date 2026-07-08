@@ -92,33 +92,36 @@ button {
   min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
+  justify-content: flex-start;
+  gap: 10px;
+  padding-left: 24px;
 }
 
 .mode-button {
-  height: 38px;
-  min-width: 108px;
-  padding: 0 16px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  color: #1f2c36;
-  background: #fff8e8;
-  font-size: 14px;
+  height: 34px;
+  min-width: 104px;
+  padding: 0 15px;
+  border: 1px solid #d9cfb6;
+  border-radius: 10px;
+  color: #253542;
+  background: linear-gradient(180deg, #fffdf8 0%, #f8f0df 100%);
+  font-size: 13px;
   font-weight: 800;
   white-space: nowrap;
-  box-shadow: 0 1px 0 rgba(34, 49, 63, 0.06);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78), 0 1px 2px rgba(34, 49, 63, 0.08);
 }
 
 .mode-button:hover {
-  border-color: #bfc9b7;
-  background: #fffdf7;
+  border-color: #9ab7aa;
+  background: linear-gradient(180deg, #ffffff 0%, #eef7f3 100%);
+  color: #0d6f5d;
 }
 
 .mode-button.active {
   color: #fff;
   border-color: #0f8c73;
-  background: #0f8c73;
+  background: linear-gradient(180deg, #299b84 0%, #0f7f68 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 4px 10px rgba(15, 140, 115, 0.22);
 }
 
 .run-button {
