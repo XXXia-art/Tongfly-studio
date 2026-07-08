@@ -3,6 +3,7 @@ import React, {useState} from 'react';
 export default function VlmChat({bridge, vlmClient, sdClient, captureFrame}) {
   const [text, setText] = useState('');
   const [activeSkill, setActiveSkill] = useState(null);
+  const [isSkillMenuOpen, setIsSkillMenuOpen] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [messages, setMessages] = useState([
     {role: 'assistant', text: '你好，我是无人机小助手。只有点击「看画面」或运行图像理解积木时，我才会读取图传。'}
@@ -84,6 +85,16 @@ export default function VlmChat({bridge, vlmClient, sdClient, captureFrame}) {
     }
   };
 
+  const chooseImageSkill = () => {
+    setActiveSkill('image');
+    setIsSkillMenuOpen(false);
+  };
+
+  const chooseVisionSkill = () => {
+    setIsSkillMenuOpen(false);
+    askVision();
+  };
+
   return (
     <section className="vlm-chat">
       <header>
@@ -104,26 +115,29 @@ export default function VlmChat({bridge, vlmClient, sdClient, captureFrame}) {
       </div>
       <form className="chat-form" onSubmit={send}>
         <div className="chat-composer">
-          <button
-            className={`skill-toggle ${activeSkill === 'image' ? 'active' : ''}`}
-            type="button"
-            onClick={() => setActiveSkill(activeSkill === 'image' ? null : 'image')}
-            disabled={isThinking}
-            aria-label="创建图片"
-            title="创建图片"
-          >
-            +
-          </button>
-          <button
-            className="skill-action vision-skill"
-            type="button"
-            onClick={askVision}
-            disabled={isThinking}
-            aria-label="看画面"
-            title="看画面"
-          >
-            看画面
-          </button>
+          <div className="skill-menu-wrap">
+            <button
+              className={`skill-toggle ${activeSkill === 'image' || isSkillMenuOpen ? 'active' : ''}`}
+              type="button"
+              onClick={() => setIsSkillMenuOpen(open => !open)}
+              disabled={isThinking}
+              aria-label="技能菜单"
+              title="技能菜单"
+              aria-expanded={isSkillMenuOpen}
+            >
+              +
+            </button>
+            {isSkillMenuOpen && (
+              <div className="skill-menu" role="menu">
+                <button type="button" onClick={chooseImageSkill} role="menuitem">
+                  创建图片
+                </button>
+                <button type="button" onClick={chooseVisionSkill} role="menuitem">
+                  看画面
+                </button>
+              </div>
+            )}
+          </div>
           {activeSkill === 'image' && (
             <span className="skill-chip">
               <span>创建图片</span>

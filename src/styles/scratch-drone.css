@@ -779,6 +779,46 @@ button {
   background: #e7f0ff;
 }
 
+.skill-menu-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.skill-menu {
+  position: absolute;
+  left: 0;
+  bottom: 44px;
+  z-index: 30;
+  min-width: 104px;
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(34, 49, 63, 0.16);
+}
+
+.skill-menu button {
+  width: 100%;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 10px;
+  border-radius: 6px;
+  color: #162533;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.skill-menu button:hover {
+  color: #2f6fe5;
+  background: #e7f0ff;
+}
+
 .skill-action {
   height: 32px;
   display: inline-flex;
