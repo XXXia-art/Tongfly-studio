@@ -1,6 +1,7 @@
 node_modules/
 dist/
 *.log
+*.pid
 vite-dev.pid
 scratch-drone-preview.png
 .env.local
