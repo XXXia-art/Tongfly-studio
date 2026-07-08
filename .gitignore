@@ -5,6 +5,30 @@ dist/
 vite-dev.pid
 scratch-drone-preview.png
 .env.local
+.env
+.env.*.local
+
+# Local IDE / agent / OS files
+.agents/
+.codex/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local screenshots and temporary test artifacts
+*.png.tmp
+*-check.png
+*-screenshot.png
+playwright-report/
+test-results/
+
+# Runtime output files generated on RK3588
+Tongfly-output/
+output/
+outputs/
+tmp/
+temp/
 
 # Archived Python inference server
 assets/legacy-server/__pycache__/

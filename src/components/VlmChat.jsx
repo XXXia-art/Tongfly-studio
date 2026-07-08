@@ -7,14 +7,21 @@ const createMessageId = () => {
   return `message-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
 
-export default function VlmChat({bridge, vlmClient, sdClient, captureFrame, outputMessages = []}) {
+export default function VlmChat({
+  bridge,
+  vlmClient,
+  sdClient,
+  captureFrame,
+  outputMessages = [],
+  onModeAction
+}) {
   const [text, setText] = useState('');
   const [activeSkill, setActiveSkill] = useState(null);
   const [isSkillMenuOpen, setIsSkillMenuOpen] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const seenOutputIdsRef = useRef(new Set());
   const [messages, setMessages] = useState([
-    {role: 'assistant', text: '你好，我是无人机小助手。只有点击「看画面」或运行图像理解积木时，我才会读取图传。'}
+    {role: 'assistant', text: '你好，我是无人机小助手。可以选择技能后发送文字，或点击麦克风启动语音模式。'}
   ]);
 
   const addMessage = message => setMessages(current => [...current, message]);
@@ -52,6 +59,21 @@ export default function VlmChat({bridge, vlmClient, sdClient, captureFrame, outp
       setIsThinking(true);
       try {
         updateMessage(pendingId, {text: await sdClient.createImage(value), loading: false});
+      } catch (error) {
+        updateMessage(pendingId, {text: `发送失败：${error.message}`, error: true, loading: false});
+      } finally {
+        setIsThinking(false);
+      }
+      return;
+    }
+
+    if (activeSkill === 'flight') {
+      setActiveSkill(null);
+      addMessage({role: 'user', text: value, skill: '掌控飞行'});
+      addMessage({id: pendingId, role: 'assistant', text: '正在发送到总控状态机', loading: true});
+      setIsThinking(true);
+      try {
+        updateMessage(pendingId, {text: await vlmClient.chat(`掌控飞行：${value}`), loading: false});
       } catch (error) {
         updateMessage(pendingId, {text: `发送失败：${error.message}`, error: true, loading: false});
       } finally {
@@ -98,10 +120,34 @@ export default function VlmChat({bridge, vlmClient, sdClient, captureFrame, outp
     setIsSkillMenuOpen(false);
   };
 
+  const chooseFlightSkill = () => {
+    setActiveSkill('flight');
+    setIsSkillMenuOpen(false);
+  };
+
   const chooseVisionSkill = () => {
     setIsSkillMenuOpen(false);
-    askVision();
+    onModeAction?.({mode: 5, describe: '查看画面'});
   };
+
+  const startVoiceMode = () => {
+    setIsSkillMenuOpen(false);
+    if (activeSkill === 'image') {
+      onModeAction?.({mode: 3, describe: '语音SD生成图片'});
+      return;
+    }
+    if (activeSkill === 'flight') {
+      onModeAction?.({mode: 2, describe: '语音掌控飞行'});
+      return;
+    }
+    onModeAction?.({mode: 2, describe: '语音掌控飞行'});
+  };
+
+  const voiceTitle = activeSkill === 'image'
+    ? '语音SD生成图片'
+    : activeSkill === 'flight'
+      ? '语音掌控飞行'
+      : '语音掌控飞行';
 
   return (
     <section className="vlm-chat">
@@ -122,50 +168,69 @@ export default function VlmChat({bridge, vlmClient, sdClient, captureFrame, outp
         ))}
       </div>
       <form className="chat-form" onSubmit={send}>
-        <div className="chat-composer">
-          <div className="skill-menu-wrap">
-            <button
-              className={`skill-toggle ${activeSkill === 'image' || isSkillMenuOpen ? 'active' : ''}`}
-              type="button"
-              onClick={() => setIsSkillMenuOpen(open => !open)}
-              disabled={isThinking}
-              aria-label="技能菜单"
-              title="技能菜单"
-              aria-expanded={isSkillMenuOpen}
-            >
-              +
-            </button>
-            {isSkillMenuOpen && (
-              <div className="skill-menu" role="menu">
-                <button type="button" onClick={chooseImageSkill} role="menuitem">
-                  创建图片
-                </button>
-                <button type="button" onClick={chooseVisionSkill} role="menuitem">
-                  看画面
-                </button>
-              </div>
+        <div className="chat-action-row">
+          <div className="chat-composer">
+            <div className="skill-menu-wrap">
+              <button
+                className={`skill-toggle ${activeSkill || isSkillMenuOpen ? 'active' : ''}`}
+                type="button"
+                onClick={() => setIsSkillMenuOpen(open => !open)}
+                disabled={isThinking}
+                aria-label="技能菜单"
+                title="技能菜单"
+                aria-expanded={isSkillMenuOpen}
+              >
+                +
+              </button>
+              {isSkillMenuOpen && (
+                <div className="skill-menu" role="menu">
+                  <button type="button" onClick={chooseImageSkill} role="menuitem">
+                    创建图片
+                  </button>
+                  <button type="button" onClick={chooseFlightSkill} role="menuitem">
+                    掌控飞行
+                  </button>
+                  <button type="button" onClick={chooseVisionSkill} role="menuitem">
+                    查看画面
+                  </button>
+                </div>
+              )}
+            </div>
+            {activeSkill && (
+              <span className="skill-chip">
+                <span>{activeSkill === 'image' ? '创建图片' : '掌控飞行'}</span>
+                <button type="button" onClick={() => setActiveSkill(null)} aria-label="取消技能">×</button>
+              </span>
             )}
+            <input
+              value={text}
+              onChange={event => setText(event.target.value)}
+              disabled={isThinking}
+              placeholder={activeSkill === 'image' ? '描述你想生成的图片' : activeSkill === 'flight' ? '描述你想让无人机执行的动作' : '问小助手，或选择技能'}
+            />
+            <button
+              className="send-button"
+              type="button"
+              onClick={() => send()}
+              disabled={isThinking || !text.trim()}
+              aria-label="发送"
+            >
+              ↑
+            </button>
           </div>
-          {activeSkill === 'image' && (
-            <span className="skill-chip">
-              <span>创建图片</span>
-              <button type="button" onClick={() => setActiveSkill(null)} aria-label="取消创建图片">×</button>
-            </span>
-          )}
-          <input
-            value={text}
-            onChange={event => setText(event.target.value)}
-            disabled={isThinking}
-            placeholder={activeSkill === 'image' ? '描述你想生成的图片' : '问小助手，或选择技能'}
-          />
           <button
-            className="send-button"
+            className={`voice-control-button ${activeSkill === 'image' || activeSkill === 'flight' ? 'active' : ''}`}
             type="button"
-            onClick={() => send()}
-            disabled={isThinking || !text.trim()}
-            aria-label="发送"
+            onClick={startVoiceMode}
+            aria-label={voiceTitle}
+            title={voiceTitle}
           >
-            ↑
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 15c1.7 0 3-1.3 3-3V6c0-1.7-1.3-3-3-3S9 4.3 9 6v6c0 1.7 1.3 3 3 3Z" />
+              <path d="M5 11.5a7 7 0 0 0 14 0" />
+              <path d="M12 18.5V22" />
+              <path d="M8 22h8" />
+            </svg>
           </button>
         </div>
       </form>

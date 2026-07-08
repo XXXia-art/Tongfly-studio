@@ -51,8 +51,8 @@ class DroneBridgeMock {
 
   async sendMissionFile(missionFile) {
     const result = await sendContent({
-      type: 'mission',
-      source: '编程积木',
+      mode: 1,
+      describe: '编程积木编译结果',
       payload: missionFile
     });
     this.lastMissionFile = {

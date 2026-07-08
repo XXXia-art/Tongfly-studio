@@ -133,6 +133,25 @@ button {
   font-weight: 800;
 }
 
+.reset-control-button {
+  height: 38px;
+  padding: 0 16px;
+  border: 1px solid #c89f59;
+  border-radius: 8px;
+  color: #6b3e12;
+  background: linear-gradient(180deg, #fff6df 0%, #f1cf8a 100%);
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.68), 0 2px 6px rgba(107, 62, 18, 0.13);
+}
+
+.reset-control-button:hover {
+  border-color: #9c6a1f;
+  color: #432609;
+  background: linear-gradient(180deg, #fff8ea 0%, #e8bd65 100%);
+}
+
 .scratch-layout {
   min-height: 0;
   display: grid;
@@ -369,29 +388,26 @@ button {
 
 .editor-toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 160px auto;
+  grid-template-columns: minmax(280px, auto) minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
   padding: 16px;
   border-bottom: 1px solid var(--line);
 }
 
-.editor-toolbar h1 {
-  margin: 0;
-  font-size: 18px;
-}
-
-.editor-toolbar p {
-  margin: 3px 0 0;
-  color: #687782;
-  font-size: 12px;
+.module-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .editor-toolbar input {
+  width: 240px;
   height: 38px;
   padding: 0 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
+  background: #fffdf7;
 }
 
 .editor-toolbar button {
@@ -401,6 +417,18 @@ button {
   color: #fff;
   background: #4d7a64;
   font-weight: 800;
+}
+
+.editor-toolbar .module-save-button {
+  min-width: 104px;
+}
+
+.editor-toolbar .editor-run-button {
+  grid-column: 3;
+  min-width: 118px;
+  height: 42px;
+  background: #0f8c73;
+  font-size: 16px;
 }
 
 .program-canvas {
@@ -811,7 +839,15 @@ button {
   background: #f5eddc;
 }
 
+.chat-action-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .chat-composer {
+  flex: 1;
+  min-width: 0;
   min-height: 48px;
   display: flex;
   align-items: center;
@@ -950,8 +986,43 @@ button {
   z-index: 2;
 }
 
+.voice-control-button {
+  flex: 0 0 46px;
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #c8bea9;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(180deg, #767676 0%, #565656 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 3px 10px rgba(34, 49, 63, 0.18);
+}
+
+.voice-control-button:hover {
+  background: linear-gradient(180deg, #656565 0%, #3f3f3f 100%);
+  transform: translateY(-1px);
+}
+
+.voice-control-button.active {
+  border-color: #0f8c73;
+  background: linear-gradient(180deg, #20a789 0%, #0f7f68 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 5px 12px rgba(15, 140, 115, 0.24);
+}
+
+.voice-control-button svg {
+  width: 23px;
+  height: 23px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .chat-composer button:disabled,
-.chat-composer input:disabled {
+.chat-composer input:disabled,
+.voice-control-button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }

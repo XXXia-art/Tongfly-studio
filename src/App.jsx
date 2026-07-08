@@ -10,7 +10,6 @@ import {readOutput} from './services/outputBus.js';
 
 const modeButtons = [
   {mode: 1, label: '编程积木', describe: '开始编程积木模型'},
-  {mode: 2, label: '语音控制', describe: '开始语音控制模型'},
   {mode: 3, label: '创意喷绘', describe: '开始创意喷绘模型'},
   {mode: 4, label: '手势控制', describe: '开始手势控制模型'}
 ];
@@ -93,6 +92,31 @@ export default function App() {
     }
   };
 
+  const resetFlightControl = async () => {
+    try {
+      const result = await sendMode({
+        mode: 0,
+        describe: '重置飞控'
+      });
+      addLog(`重置飞控已发送到 ${result.udp?.target}`);
+    } catch (error) {
+      addLog(`重置飞控发送失败：${error.message}`);
+    }
+  };
+
+  const sendModeAction = async ({mode = 2, describe = '语音掌控飞行'} = {}) => {
+    setActiveMode(mode);
+    try {
+      const result = await sendMode({
+        mode,
+        describe
+      });
+      addLog(`${describe} 已发送到 ${result.udp?.target}`);
+    } catch (error) {
+      addLog(`语音控制发送失败：${error.message}`);
+    }
+  };
+
   return (
     <div className="scratch-app">
       <header className="scratch-topbar">
@@ -115,22 +139,23 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <button className="run-button" onClick={runPreview}>运行</button>
+        <button className="reset-control-button" type="button" onClick={resetFlightControl}>
+          重置飞控
+        </button>
       </header>
 
       <main className="scratch-layout">
         <section className="editor-stage scratch-blocks-stage">
           <div className="editor-toolbar">
-            <div>
-              <h1>我的飞行程序</h1>
-              <p>官方 Scratch Blocks 工作区</p>
+            <div className="module-toolbar-group">
+              <input
+                value={moduleName}
+                onChange={event => setModuleName(event.target.value)}
+                aria-label="模块名称"
+              />
+              <button className="module-save-button" type="button" onClick={saveModule}>封装模块</button>
             </div>
-            <input
-              value={moduleName}
-              onChange={event => setModuleName(event.target.value)}
-              aria-label="模块名称"
-            />
-            <button type="button" onClick={saveModule}>封装模块</button>
+            <button className="run-button editor-run-button" type="button" onClick={runPreview}>运行</button>
           </div>
           <ScratchBlocksEditor
             ref={blocksEditorRef}
@@ -147,6 +172,7 @@ export default function App() {
             sdClient={sdClient}
             captureFrame={captureFrame}
             outputMessages={vlmOutputs}
+            onModeAction={sendModeAction}
           />
         </aside>
       </main>

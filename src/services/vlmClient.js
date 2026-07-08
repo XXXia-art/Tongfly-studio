@@ -4,8 +4,8 @@ import {sendContent} from './controlBus.js';
 class VLMClient {
   async chat(text) {
     const result = await sendContent({
-      type: 'vlm_input',
-      source: '无人机小助手',
+      mode: 2,
+      describe: '文本掌控飞行',
       payload: {text}
     });
     return `已发送到总控状态机：${result.udp?.target || 'content UDP'}`;
@@ -13,8 +13,8 @@ class VLMClient {
 
   async describeFrame(question, frameMeta, imageBase64) {
     const result = await sendContent({
-      type: 'vlm_input',
-      source: '无人机小助手',
+      mode: 5,
+      describe: '查看画面内容',
       payload: {
         text: question,
         request: 'describe_frame',

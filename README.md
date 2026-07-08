@@ -15,6 +15,17 @@ npm run dev -- --host 0.0.0.0
 - `content` 模块：UDP `127.0.0.1:9200`
 - `output` 返回：Vite 监听 UDP `127.0.0.1:9300`
 
+前端发给总控的 UDP 包统一使用 `mode + describe` 作为标志位，不再使用顶层 `type` 字段。具体数据放在 `payload` 中：
+
+```json
+{
+  "mode": 1,
+  "describe": "编程积木编译结果",
+  "payload": {},
+  "sentAt": "时间"
+}
+```
+
 可以通过环境变量修改目标地址：
 
 ```bash
