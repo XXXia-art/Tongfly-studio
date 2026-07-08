@@ -1,8 +1,11 @@
 import React, {useEffect, useImperativeHandle, useRef, useState} from 'react';
 
-const DroneStage = React.forwardRef(function DroneStage({bridge}, ref) {
+const DroneStage = React.forwardRef(function DroneStage({bridge, sdOutput}, ref) {
   const canvasRef = useRef(null);
   const [drone, setDrone] = useState(bridge.getState());
+  const imageSrc = sdOutput?.payload?.image_url || sdOutput?.payload?.image || null;
+  const prompt = sdOutput?.payload?.prompt || sdOutput?.payload?.text || '';
+  const imagePath = sdOutput?.payload?.image_path || '';
 
   useEffect(() => bridge.subscribe(setDrone), [bridge]);
 
@@ -83,10 +86,19 @@ const DroneStage = React.forwardRef(function DroneStage({bridge}, ref) {
         <h2>SD 图片显示</h2>
         <span>Image preview</span>
       </header>
-      <canvas ref={canvasRef} width="680" height="340" />
+      <div className="sd-preview">
+        <canvas ref={canvasRef} width="680" height="340" />
+        {imageSrc && (
+          <img
+            className="sd-preview-image"
+            src={imageSrc}
+            alt={prompt || 'SD 图片输出'}
+          />
+        )}
+      </div>
       <div className="hud">
-        <strong>状态 待生成</strong>
-        <strong>尺寸 预留</strong>
+        <strong>状态 {imageSrc ? '已接收' : '待生成'}</strong>
+        <strong title={imagePath || undefined}>路径 {imagePath ? '已映射' : '等待'}</strong>
         <strong>来源 SD</strong>
         <strong>模式 创意喷绘</strong>
       </div>

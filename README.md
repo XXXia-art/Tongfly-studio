@@ -13,13 +13,39 @@ npm run dev -- --host 0.0.0.0
 
 - `mode` 模块：UDP `127.0.0.1:9100`
 - `content` 模块：UDP `127.0.0.1:9200`
+- `output` 返回：Vite 监听 UDP `127.0.0.1:9300`
 
 可以通过环境变量修改目标地址：
 
 ```bash
 TONGFLY_MODE_UDP_HOST=127.0.0.1 TONGFLY_MODE_UDP_PORT=9100 \
 TONGFLY_CONTENT_UDP_HOST=127.0.0.1 TONGFLY_CONTENT_UDP_PORT=9200 \
+TONGFLY_OUTPUT_UDP_HOST=127.0.0.1 TONGFLY_OUTPUT_UDP_PORT=9300 \
+TONGFLY_OUTPUT_IMAGE_ROOT=/home/elf \
 npm run dev -- --host 0.0.0.0
+```
+
+总控返回 SD 图片时，推荐通过 UDP `9300` 发送图片路径：
+
+```json
+{
+  "type": "sd_result",
+  "payload": {
+    "image_path": "/home/elf/Tongfly-output/images/sd_001.png",
+    "prompt": "一架无人机在天空中"
+  }
+}
+```
+
+总控返回 VLM 文本时：
+
+```json
+{
+  "type": "vlm_result",
+  "payload": {
+    "text": "我看到了前方有障碍物"
+  }
+}
 ```
 
 旧的 FastAPI 后端、VLM/SD 模型调用代码已经归档到：

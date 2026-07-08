@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 
 const createMessageId = () => {
   if (globalThis.crypto?.randomUUID) {
@@ -7,16 +7,32 @@ const createMessageId = () => {
   return `message-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
 
-export default function VlmChat({bridge, vlmClient, sdClient, captureFrame}) {
+export default function VlmChat({bridge, vlmClient, sdClient, captureFrame, outputMessages = []}) {
   const [text, setText] = useState('');
   const [activeSkill, setActiveSkill] = useState(null);
   const [isSkillMenuOpen, setIsSkillMenuOpen] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
+  const seenOutputIdsRef = useRef(new Set());
   const [messages, setMessages] = useState([
     {role: 'assistant', text: '你好，我是无人机小助手。只有点击「看画面」或运行图像理解积木时，我才会读取图传。'}
   ]);
 
   const addMessage = message => setMessages(current => [...current, message]);
+  useEffect(() => {
+    const incoming = outputMessages.filter(message => !seenOutputIdsRef.current.has(message.id));
+    if (!incoming.length) return;
+    incoming.forEach(message => seenOutputIdsRef.current.add(message.id));
+    setMessages(current => [
+      ...current,
+      ...incoming.map(message => ({
+        id: `output-${message.id}`,
+        role: 'assistant',
+        text: message.payload?.text || message.payload?.answer || JSON.stringify(message.payload ?? message)
+      }))
+    ]);
+    setIsThinking(false);
+  }, [outputMessages]);
+
   const updateMessage = (id, patch) => {
     setMessages(current => current.map(message => (
       message.id === id ? {...message, ...patch} : message
@@ -35,7 +51,7 @@ export default function VlmChat({bridge, vlmClient, sdClient, captureFrame}) {
       addMessage({id: pendingId, role: 'assistant', text: '正在发送到总控状态机', loading: true});
       setIsThinking(true);
       try {
-        updateMessage(pendingId, {text: await vlmClient.chat(`创建图片：${value}`), loading: false});
+        updateMessage(pendingId, {text: await sdClient.createImage(value), loading: false});
       } catch (error) {
         updateMessage(pendingId, {text: `发送失败：${error.message}`, error: true, loading: false});
       } finally {

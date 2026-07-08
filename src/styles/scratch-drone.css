@@ -676,10 +676,27 @@ button {
   font-size: 12px;
 }
 
+.sd-preview {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  background: #f1eadb;
+}
+
 .drone-stage canvas {
   width: 100%;
   height: 100%;
   display: block;
+}
+
+.sd-preview-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  background: #111820;
 }
 
 .hud {

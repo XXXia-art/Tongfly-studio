@@ -1,4 +1,4 @@
-import React, {useMemo, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {droneBridge} from './services/droneBridge.js';
 import {vlmClient} from './services/vlmClient.js';
 import {sdClient} from './services/sdClient.js';
@@ -6,6 +6,7 @@ import DroneStage from './components/DroneStage.jsx';
 import VlmChat from './components/VlmChat.jsx';
 import ScratchBlocksEditor from './components/ScratchBlocksEditor.jsx';
 import {sendMode} from './services/controlBus.js';
+import {readOutput} from './services/outputBus.js';
 
 const modeButtons = [
   {mode: 1, label: '编程积木', describe: '开始编程积木模型'},
@@ -17,8 +18,11 @@ const modeButtons = [
 export default function App() {
   const [moduleName, setModuleName] = useState('阶梯式飞行');
   const [activeMode, setActiveMode] = useState(modeButtons[0].mode);
+  const [sdOutput, setSdOutput] = useState(null);
+  const [vlmOutputs, setVlmOutputs] = useState([]);
   const blocksEditorRef = useRef(null);
   const droneStageRef = useRef(null);
+  const outputIdRef = useRef(0);
   const services = useMemo(() => ({droneBridge, vlmClient, sdClient}), []);
 
   const captureFrame = () => droneStageRef.current?.captureFrame();
@@ -26,6 +30,38 @@ export default function App() {
   const addLog = text => {
     console.info(text);
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer = null;
+
+    const pollOutput = async () => {
+      try {
+        const result = await readOutput(outputIdRef.current);
+        if (cancelled) return;
+        outputIdRef.current = result.latestId || outputIdRef.current;
+        for (const message of result.messages || []) {
+          if (message.type === 'sd_result') {
+            setSdOutput(message);
+          } else if (message.type === 'vlm_result') {
+            setVlmOutputs(current => [...current.slice(-20), message]);
+          }
+        }
+      } catch (error) {
+        console.warn('read output failed', error);
+      } finally {
+        if (!cancelled) {
+          timer = window.setTimeout(pollOutput, 800);
+        }
+      }
+    };
+
+    pollOutput();
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, []);
 
   const saveModule = () => {
     const name = moduleName.trim() || '我的模块';
@@ -104,12 +140,13 @@ export default function App() {
         </section>
 
         <aside className="right-panel">
-          <DroneStage ref={droneStageRef} bridge={droneBridge} />
+          <DroneStage ref={droneStageRef} bridge={droneBridge} sdOutput={sdOutput} />
           <VlmChat
             bridge={droneBridge}
             vlmClient={vlmClient}
             sdClient={sdClient}
             captureFrame={captureFrame}
+            outputMessages={vlmOutputs}
           />
         </aside>
       </main>
