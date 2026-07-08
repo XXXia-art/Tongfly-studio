@@ -15,14 +15,10 @@ async function postJson(path, body) {
 
 export function sendMode(payload) {
   return postJson('/bridge/mode', {
-    ...payload,
-    sentAt: new Date().toISOString()
+    mode: payload.mode
   });
 }
 
 export function sendContent(payload) {
-  return postJson('/bridge/content', {
-    ...payload,
-    sentAt: new Date().toISOString()
-  });
+  return postJson('/bridge/content', payload);
 }

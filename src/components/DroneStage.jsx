@@ -3,9 +3,9 @@ import React, {useEffect, useImperativeHandle, useRef, useState} from 'react';
 const DroneStage = React.forwardRef(function DroneStage({bridge, sdOutput}, ref) {
   const canvasRef = useRef(null);
   const [drone, setDrone] = useState(bridge.getState());
-  const imageSrc = sdOutput?.payload?.image_url || sdOutput?.payload?.image || null;
-  const prompt = sdOutput?.payload?.prompt || sdOutput?.payload?.text || '';
-  const imagePath = sdOutput?.payload?.image_path || '';
+  const imageSrc = sdOutput?.image_url || sdOutput?.image || null;
+  const prompt = sdOutput?.prompt_en || sdOutput?.prompt || sdOutput?.text || '';
+  const imagePath = sdOutput?.image_path || '';
 
   useEffect(() => bridge.subscribe(setDrone), [bridge]);
 

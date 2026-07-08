@@ -15,14 +15,11 @@ npm run dev -- --host 0.0.0.0
 - `content` 模块：UDP `127.0.0.1:9200`
 - `output` 返回：Vite 监听 UDP `127.0.0.1:9300`
 
-前端发给总控的 UDP 包统一使用 `mode + describe` 作为标志位，不再使用顶层 `type` 字段。具体数据放在 `payload` 中：
+前端发给总控的 UDP 包不再使用顶层 `type` 字段。`mode` 模块只发送 `mode` 一个字段，具体内容数据通过 `content` 模块发送。
 
 ```json
 {
-  "mode": 1,
-  "describe": "编程积木编译结果",
-  "payload": {},
-  "sentAt": "时间"
+  "mode": 1
 }
 ```
 
@@ -48,13 +45,11 @@ npm run dev -- --host 0.0.0.0
 }
 ```
 
-总控返回 VLM 文本时，建议带上 `mode` 区分回复来源：
+总控返回 VLM 文本时，直接用 `type` 区分回复来源，不再使用 `mode` 字段：
 
 ```json
 {
-  "type": "vlm_result",
-  "mode": 6,
-  "describe": "VLM对话回复",
+  "type": "vlm_chat_result",
   "payload": {
     "text": "模型回复内容"
   }
@@ -87,16 +82,15 @@ npm run dev -- --host 0.0.0.0
 | `GET /bridge/output` | 前端轮询读取总控返回 |
 | `GET /bridge/output-image?path=...` | 把 RK3588 本地图片路径映射成浏览器可访问图片 |
 
-### 前端发送包通用格式
+### 前端发送包格式
 
-前端发给总控的 UDP 包统一使用 `mode + describe`，不再使用顶层 `type` 字段：
+前端发给总控的 UDP 包不使用顶层 `type` 字段。`mode` 包和 `content` 包格式不同。
+
+`mode` 包走 UDP `9100`，只允许一个字段：
 
 ```json
 {
-  "mode": 1,
-  "describe": "编程积木编译结果",
-  "payload": {},
-  "sentAt": "2026-07-08T12:00:00.000Z"
+  "mode": 1
 }
 ```
 
@@ -105,38 +99,33 @@ npm run dev -- --host 0.0.0.0
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `mode` | number | 指令/模式编号 |
-| `describe` | string | 动作说明，也是总控分流标志之一 |
-| `payload` | object | 具体内容数据，可选 |
-| `sentAt` | string | 前端发送时间 |
+
+`content` 包走 UDP `9200`，用于发送具体内容。不同 `mode` 的字段不同，不再统一包一层 `payload`，也不再发送 `describe` 和 `sentAt`。
 
 ### UDP 9100: mode 指令
 
-| mode | describe | 触发位置 | 说明 |
-| --- | --- | --- | --- |
-| `0` | `重置飞控` | 顶部 `重置飞控` 按钮 | 通知总控重置飞控状态 |
-| `1` | `开始编程积木模型` | 顶部 `编程积木` 按钮 | 进入积木编程模式 |
-| `2` | `语音掌控飞行` | 选择 `掌控飞行` 后点击麦克风 | 启动语音控飞流程 |
-| `3` | `开始创意喷绘模型` | 顶部 `创意喷绘` 按钮 | 进入创意喷绘模式 |
-| `3` | `语音SD生成图片` | 选择 `创建图片` 后点击麦克风 | 启动语音 SD 生成图片流程 |
-| `4` | `开始手势控制模型` | 顶部 `手势控制` 按钮 | 进入手势控制模式 |
-| `5` | `查看画面` | `+` 技能菜单点击 `查看画面` | 通知总控执行图像理解/查看画面 |
-| `6` | `VLM对话` | 右下角输入框直接点击发送 | 用户和 VLM 普通对话 |
+| mode | 触发位置 | 说明 |
+| --- | --- | --- |
+| `0` | 顶部 `重置飞控` 按钮 | 通知总控重置飞控状态 |
+| `1` | 顶部 `编程积木` 按钮 | 进入积木编程模式 |
+| `2` | `+` 技能菜单点击 `掌控飞行` | 进入掌控飞行模式，只发送 mode 包 |
+| `3` | 顶部 `创意喷绘` 按钮 | 进入创意喷绘模式 |
+| `4` | `+` 技能菜单点击 `创建图片` | 进入 SD 图片生成模式，只发送 mode 包 |
+| `5` | 顶部 `手势识别` 按钮 | 进入手势识别模式 |
+| `6` | `+` 技能菜单点击 `查看画面` | 进入查看画面模式，之后点击发送再发 content 包 |
+| `7` | `+` 技能菜单点击 `普通对话` | 进入普通 VLM 对话模式，之后点击发送再发 content 包 |
 
 示例：
 
 ```json
 {
-  "mode": 2,
-  "describe": "语音掌控飞行",
-  "sentAt": "2026-07-08T12:00:00.000Z"
+  "mode": 2
 }
 ```
 
 ```json
 {
-  "mode": 3,
-  "describe": "语音SD生成图片",
-  "sentAt": "2026-07-08T12:00:00.000Z"
+  "mode": 4
 }
 ```
 
@@ -144,7 +133,7 @@ npm run dev -- --host 0.0.0.0
 
 #### 编程积木编译结果
 
-点击积木区 `运行` 后发送。总控真正执行飞行时，优先读取 `payload.flightActions`。
+点击积木区 `运行` 后发送。总控真正执行飞行时，直接读取顶层 `flightActions`。
 
 `flightActions` 是运动学速度指令数组：
 
@@ -159,51 +148,29 @@ npm run dev -- --host 0.0.0.0
 ```json
 {
   "mode": 1,
-  "describe": "编程积木编译结果",
-  "payload": {
-    "format": "TongfeiDroneMission",
-    "version": 1,
-    "id": "tdm-xxx",
-    "createdAt": "2026-07-08T12:00:00.000Z",
-    "target": {
-      "onboard": "edge-chip",
-      "downstream": "flight-controller"
+  "flightActions": [
+    {
+      "vx": 1,
+      "vy": 0,
+      "vz": 0,
+      "yaw_rate": 0,
+      "duration": 2
     },
-    "safety": {
-      "maxForeverIterations": 6,
-      "requiresAck": true
+    {
+      "vx": 0,
+      "vy": 0,
+      "vz": 0.6,
+      "yaw_rate": 0,
+      "duration": 1
     },
-    "programs": [],
-    "source": {
-      "type": "scratch-blocks-xml",
-      "xml": "<xml>...</xml>"
-    },
-    "flightActions": [
-      {
-        "vx": 1,
-        "vy": 0,
-        "vz": 0,
-        "yaw_rate": 0,
-        "duration": 2
-      },
-      {
-        "vx": 0,
-        "vy": 0,
-        "vz": 0.6,
-        "yaw_rate": 0,
-        "duration": 1
-      },
-      {
-        "vx": 0,
-        "vy": 0,
-        "vz": 0,
-        "yaw_rate": 30,
-        "duration": 1
-      }
-    ],
-    "checksum": "sum32:xxxxxxxx"
-  },
-  "sentAt": "2026-07-08T12:00:00.000Z"
+    {
+      "vx": 0,
+      "vy": 0,
+      "vz": 0,
+      "yaw_rate": 30,
+      "duration": 1
+    }
+  ]
 }
 ```
 
@@ -221,73 +188,25 @@ npm run dev -- --host 0.0.0.0
 | 逆时针转向，时间 `t` | `{vx: 0, vy: 0, vz: 0, yaw_rate: -30, duration: t}` |
 | 悬停/等待，时间 `t` | `{vx: 0, vy: 0, vz: 0, yaw_rate: 0, duration: t}` |
 
-#### 文本掌控飞行
+#### 查看画面内容
 
-触发：`+` 选择 `掌控飞行`，输入文字后点击发送。
-
-```json
-{
-  "mode": 2,
-  "describe": "文本掌控飞行",
-  "payload": {
-    "text": "向前飞两米然后左转"
-  },
-  "sentAt": "2026-07-08T12:00:00.000Z"
-}
-```
-
-#### VLM 对话
-
-触发：右下角输入框直接输入文字并点击发送，不选择 `创建图片` 或 `掌控飞行`。
+触发：先在 `+` 技能菜单点击 `查看画面` 进入 `mode=6`，再点击发送按钮。
 
 ```json
 {
   "mode": 6,
-  "describe": "VLM对话",
-  "payload": {
-    "text": "请介绍一下当前任务状态"
-  },
-  "sentAt": "2026-07-08T12:00:00.000Z"
+  "test": "请查看当前画面"
 }
 ```
 
-#### 文本 SD 生成图片
+#### 普通对话内容
+
+触发：先在 `+` 技能菜单点击 `普通对话` 进入 `mode=7`，再点击发送按钮。
 
 ```json
 {
-  "mode": 3,
-  "describe": "文本SD生成图片",
-  "payload": {
-    "prompt": "一架红色无人机在天空中飞行"
-  },
-  "sentAt": "2026-07-08T12:00:00.000Z"
-}
-```
-
-#### 查看画面内容
-
-当前 `查看画面` 主要走 UDP `9100` 的 mode 指令：
-
-```json
-{
-  "mode": 5,
-  "describe": "查看画面",
-  "sentAt": "2026-07-08T12:00:00.000Z"
-}
-```
-
-若后续要把截图或画面元信息一起传给总控，可使用 UDP `9200`：
-
-```json
-{
-  "mode": 5,
-  "describe": "查看画面内容",
-  "payload": {
-    "text": "请查看当前画面",
-    "frameMeta": {},
-    "image_base64": "data:image/png;base64,..."
-  },
-  "sentAt": "2026-07-08T12:00:00.000Z"
+  "mode": 7,
+  "text": "请介绍一下当前任务状态"
 }
 ```
 
@@ -295,23 +214,22 @@ npm run dev -- --host 0.0.0.0
 
 总控把结果发送到 UDP `127.0.0.1:9300`。Vite 缓存消息，前端通过 `/bridge/output` 轮询读取。
 
-当前返回包使用顶层 `type` 决定前端显示位置，VLM 返回再用 `mode` 区分回复来源：
+当前返回包使用顶层 `type` 决定前端显示位置。返回包不使用 `payload`，内容字段直接放在顶层。控飞解析结果当前不需要返回给前端。
 
 | type | 前端显示位置 |
 | --- | --- |
 | `sd_result` | 右上角 SD 图片显示区 |
-| `vlm_result` | 右下角聊天区，结合 `mode` 区分查看画面/普通对话/控飞解析 |
+| `vlm_chat_result` | 右下角聊天区，普通 VLM 对话回复 |
+| `vlm_vision_result` | 右下角聊天区，查看画面/图像理解回复 |
 
 SD 图片返回推荐格式：
 
 ```json
 {
   "type": "sd_result",
-  "payload": {
-    "asr_text": "画一架红色无人机在天空中飞行",
-    "prompt_en": "A red drone flying in the sky",
-    "image_path": "/home/elf/Tongfly-output/images/sd_001.png"
-  }
+  "asr_text": "画一架红色无人机在天空中飞行",
+  "prompt_en": "A red drone flying in the sky",
+  "image_path": "/home/elf/Tongfly-output/images/sd_001.png"
 }
 ```
 
@@ -319,12 +237,8 @@ VLM 普通文本对话返回：
 
 ```json
 {
-  "type": "vlm_result",
-  "mode": 6,
-  "describe": "VLM对话回复",
-  "payload": {
-    "text": "模型回复内容"
-  }
+  "type": "vlm_chat_result",
+  "text": "模型回复内容"
 }
 ```
 
@@ -332,32 +246,9 @@ VLM 普通文本对话返回：
 
 ```json
 {
-  "type": "vlm_result",
-  "mode": 5,
-  "describe": "查看画面回复",
-  "payload": {
-    "text": "我看到了前方有障碍物"
-  }
-}
-```
-
-飞行指令解析结果也可以先用 `vlm_result` 返回给前端显示：
-
-```json
-{
-  "type": "vlm_result",
-  "mode": 2,
-  "describe": "文本掌控飞行解析结果",
-  "payload": {
-    "text": "已解析为：向前 2 米，然后左转 90 度",
-    "commands": [
-      {
-        "action": "forward",
-        "distance": 2,
-        "unit": "m"
-      }
-    ]
-  }
+  "type": "vlm_vision_result",
+  "text": "我看到了前方有障碍物",
+  "image_path": "/home/elf/Tongfly-output/images/vision_001.png"
 }
 ```
 
@@ -367,25 +258,22 @@ VLM 普通文本对话返回：
 监听 9100:
   mode=0 -> 重置飞控
   mode=1 -> 编程积木模式
-  mode=2 + describe=语音掌控飞行 -> 语音控飞
-  mode=3 + describe=开始创意喷绘模型 -> 创意喷绘模式
-  mode=3 + describe=语音SD生成图片 -> 语音 SD 生成
-  mode=4 -> 手势控制
-  mode=5 -> 查看画面
-  mode=6 -> VLM 普通对话
+  mode=2 -> 掌控飞行模式
+  mode=3 -> 创意喷绘模式
+  mode=4 -> SD 图片生成模式
+  mode=5 -> 手势识别模式
+  mode=6 -> 查看画面模式
+  mode=7 -> VLM 普通对话模式
 
 监听 9200:
-  mode=1 + describe=编程积木编译结果 -> 读取 payload.flightActions 并执行 vx/vy/vz/yaw_rate/duration
-  mode=2 + describe=文本掌控飞行 -> 文本控飞/VLM 解析
-  mode=3 + describe=文本SD生成图片 -> 文本 SD 生成
-  mode=5 + describe=查看画面内容 -> 图像理解
-  mode=6 + describe=VLM对话 -> 普通 VLM 对话
+  mode=1 -> 读取 flightActions 并执行 vx/vy/vz/yaw_rate/duration
+  mode=6 -> 读取 test，执行图像理解
+  mode=7 -> 读取 text，执行普通 VLM 对话
 
 返回 9300:
   type=sd_result -> 前端显示图片
-  type=vlm_result + mode=5 -> 前端显示查看画面回复
-  type=vlm_result + mode=6 -> 前端显示 VLM 对话回复
-  type=vlm_result + mode=2 -> 前端显示控飞解析回复
+  type=vlm_chat_result -> 前端显示 VLM 普通对话回复
+  type=vlm_vision_result -> 前端显示查看画面回复
 ```
 
 旧的 FastAPI 后端、VLM/SD 模型调用代码已经归档到：

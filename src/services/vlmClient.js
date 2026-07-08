@@ -3,25 +3,18 @@ import {sendContent} from './controlBus.js';
 
 class VLMClient {
   async chat(text, options = {}) {
-    const {mode = 6, describe = 'VLM对话'} = options;
+    const {mode = 7} = options;
     const result = await sendContent({
       mode,
-      describe,
-      payload: {text}
+      text
     });
     return `已发送到总控状态机：${result.udp?.target || 'content UDP'}`;
   }
 
   async describeFrame(question, frameMeta, imageBase64) {
     const result = await sendContent({
-      mode: 5,
-      describe: '查看画面内容',
-      payload: {
-        text: question,
-        request: 'describe_frame',
-        frameMeta,
-        image_base64: imageBase64 || undefined
-      }
+      mode: 6,
+      test: question
     });
     return `看画面请求已发送到总控状态机：${result.udp?.target || 'content UDP'}`;
   }

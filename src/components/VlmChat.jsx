@@ -8,9 +8,16 @@ const createMessageId = () => {
 };
 
 const outputSkillLabel = message => {
-  if (message.mode === 5) return '查看画面';
-  if (message.mode === 6) return 'VLM对话';
+  if (message.type === 'vlm_vision_result') return '查看画面';
+  if (message.type === 'vlm_chat_result') return '普通对话';
   return message.describe || '模型回复';
+};
+
+const skillLabels = {
+  image: '创建图片',
+  flight: '掌控飞行',
+  vision: '查看画面',
+  chat: '普通对话'
 };
 
 export default function VlmChat({
@@ -41,7 +48,7 @@ export default function VlmChat({
         id: `output-${message.id}`,
         role: 'assistant',
         skill: outputSkillLabel(message),
-        text: message.payload?.text || message.payload?.answer || JSON.stringify(message.payload ?? message)
+        text: outputText(message)
       }))
     ]);
     setIsThinking(false);
@@ -59,45 +66,45 @@ export default function VlmChat({
     const pendingId = createMessageId();
     setText('');
     setIsSkillMenuOpen(false);
-    if (activeSkill === 'image') {
-      setActiveSkill(null);
-      addMessage({role: 'user', text: value, skill: '创建图片'});
-      addMessage({id: pendingId, role: 'assistant', text: '正在发送到总控状态机', loading: true});
-      setIsThinking(true);
-      try {
-        updateMessage(pendingId, {text: await sdClient.createImage(value), loading: false});
-      } catch (error) {
-        updateMessage(pendingId, {text: `发送失败：${error.message}`, error: true, loading: false});
-      } finally {
-        setIsThinking(false);
-      }
+    if (!activeSkill) {
+      addMessage({role: 'user', text: value});
+      addMessage({id: pendingId, role: 'assistant', text: '请先从 + 选择需要使用的技能。', loading: false});
       return;
     }
 
-    if (activeSkill === 'flight') {
+    if (activeSkill === 'image' || activeSkill === 'flight') {
       setActiveSkill(null);
-      addMessage({role: 'user', text: value, skill: '掌控飞行'});
-      addMessage({id: pendingId, role: 'assistant', text: '正在发送到总控状态机', loading: true});
+      addMessage({role: 'user', text: value, skill: skillLabels[activeSkill]});
+      addMessage({id: pendingId, role: 'assistant', text: '当前模式不需要发送内容数据包。', loading: false});
+      return;
+    }
+
+    if (activeSkill === 'vision') {
+      setActiveSkill(null);
+      addMessage({role: 'user', text: value, skill: '查看画面'});
+      addMessage({id: pendingId, role: 'assistant', text: '正在发送查看画面内容', loading: true});
       setIsThinking(true);
       try {
+        const imageBase64 = captureFrame ? captureFrame() : null;
         updateMessage(pendingId, {
-          text: await vlmClient.chat(value, {mode: 2, describe: '文本掌控飞行'}),
+          text: await vlmClient.describeFrame(value, bridge.getFrameMeta(), imageBase64),
           loading: false
         });
       } catch (error) {
-        updateMessage(pendingId, {text: `发送失败：${error.message}`, error: true, loading: false});
+        updateMessage(pendingId, {text: `图像理解失败：${error.message}`, error: true, loading: false});
       } finally {
         setIsThinking(false);
       }
       return;
     }
 
-    addMessage({role: 'user', text: value});
+    setActiveSkill(null);
+    addMessage({role: 'user', text: value, skill: '普通对话'});
     addMessage({id: pendingId, role: 'assistant', text: '正在发送到总控状态机', loading: true});
     setIsThinking(true);
     try {
       updateMessage(pendingId, {
-        text: await vlmClient.chat(value, {mode: 6, describe: 'VLM对话'}),
+        text: await vlmClient.chat(value, {mode: 7, describe: '普通对话'}),
         loading: false
       });
     } catch (error) {
@@ -131,36 +138,45 @@ export default function VlmChat({
   const chooseImageSkill = () => {
     setActiveSkill('image');
     setIsSkillMenuOpen(false);
+    onModeAction?.({mode: 4, describe: '创建图片'});
   };
 
   const chooseFlightSkill = () => {
     setActiveSkill('flight');
     setIsSkillMenuOpen(false);
+    onModeAction?.({mode: 2, describe: '掌控飞行'});
   };
 
   const chooseVisionSkill = () => {
+    setActiveSkill('vision');
     setIsSkillMenuOpen(false);
-    onModeAction?.({mode: 5, describe: '查看画面'});
+    onModeAction?.({mode: 6, describe: '查看画面'});
+  };
+
+  const chooseChatSkill = () => {
+    setActiveSkill('chat');
+    setIsSkillMenuOpen(false);
+    onModeAction?.({mode: 7, describe: '普通对话'});
   };
 
   const startVoiceMode = () => {
     setIsSkillMenuOpen(false);
     if (activeSkill === 'image') {
-      onModeAction?.({mode: 3, describe: '语音SD生成图片'});
+      onModeAction?.({mode: 4, describe: '创建图片'});
       return;
     }
     if (activeSkill === 'flight') {
-      onModeAction?.({mode: 2, describe: '语音掌控飞行'});
+      onModeAction?.({mode: 2, describe: '掌控飞行'});
       return;
     }
-    onModeAction?.({mode: 2, describe: '语音掌控飞行'});
+    onModeAction?.({mode: 2, describe: '掌控飞行'});
   };
 
   const voiceTitle = activeSkill === 'image'
-    ? '语音SD生成图片'
+    ? '创建图片'
     : activeSkill === 'flight'
-      ? '语音掌控飞行'
-      : '语音掌控飞行';
+      ? '掌控飞行'
+      : '掌控飞行';
 
   return (
     <section className="vlm-chat">
@@ -206,12 +222,15 @@ export default function VlmChat({
                   <button type="button" onClick={chooseVisionSkill} role="menuitem">
                     查看画面
                   </button>
+                  <button type="button" onClick={chooseChatSkill} role="menuitem">
+                    普通对话
+                  </button>
                 </div>
               )}
             </div>
             {activeSkill && (
               <span className="skill-chip">
-                <span>{activeSkill === 'image' ? '创建图片' : '掌控飞行'}</span>
+                <span>{skillLabels[activeSkill]}</span>
                 <button type="button" onClick={() => setActiveSkill(null)} aria-label="取消技能">×</button>
               </span>
             )}
@@ -219,7 +238,15 @@ export default function VlmChat({
               value={text}
               onChange={event => setText(event.target.value)}
               disabled={isThinking}
-              placeholder={activeSkill === 'image' ? '描述你想生成的图片' : activeSkill === 'flight' ? '描述你想让无人机执行的动作' : '问小助手，或选择技能'}
+              placeholder={
+                activeSkill === 'vision'
+                  ? '输入想让 VLM 查看画面时回答的问题'
+                  : activeSkill === 'chat'
+                    ? '输入要和 VLM 对话的内容'
+                    : activeSkill === 'image' || activeSkill === 'flight'
+                      ? '该模式已发送，不需要发送内容'
+                      : '请先从 + 选择技能'
+              }
             />
             <button
               className="send-button"
@@ -249,4 +276,12 @@ export default function VlmChat({
       </form>
     </section>
   );
+}
+
+function outputText(message) {
+  const text = message.text || message.answer || JSON.stringify(message);
+  if (message.type === 'vlm_vision_result' && message.image_path) {
+    return `${text}\n图片路径：${message.image_path}`;
+  }
+  return text;
 }

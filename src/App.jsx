@@ -8,10 +8,15 @@ import ScratchBlocksEditor from './components/ScratchBlocksEditor.jsx';
 import {sendMode} from './services/controlBus.js';
 import {readOutput} from './services/outputBus.js';
 
+const vlmOutputTypes = new Set([
+  'vlm_chat_result',
+  'vlm_vision_result'
+]);
+
 const modeButtons = [
   {mode: 1, label: '编程积木', describe: '开始编程积木模型'},
   {mode: 3, label: '创意喷绘', describe: '开始创意喷绘模型'},
-  {mode: 4, label: '手势控制', describe: '开始手势控制模型'}
+  {mode: 5, label: '手势识别', describe: '开始手势识别模型'}
 ];
 
 export default function App() {
@@ -42,7 +47,7 @@ export default function App() {
         for (const message of result.messages || []) {
           if (message.type === 'sd_result') {
             setSdOutput(message);
-          } else if (message.type === 'vlm_result') {
+          } else if (vlmOutputTypes.has(message.type)) {
             setVlmOutputs(current => [...current.slice(-20), message]);
           }
         }
@@ -104,7 +109,7 @@ export default function App() {
     }
   };
 
-  const sendModeAction = async ({mode = 2, describe = '语音掌控飞行'} = {}) => {
+  const sendModeAction = async ({mode = 2, describe = '掌控飞行'} = {}) => {
     setActiveMode(mode);
     try {
       const result = await sendMode({
