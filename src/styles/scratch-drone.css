@@ -44,7 +44,6 @@ button {
 .scratch-app input {
   opacity: 1;
   -webkit-text-fill-color: currentColor;
-  text-shadow: 0 0 0 currentColor;
 }
 
 .scratch-app {
@@ -564,16 +563,16 @@ button {
   stroke-opacity: 1 !important;
   filter: none !important;
   mix-blend-mode: normal !important;
-  font-weight: 700 !important;
+  font-weight: 900 !important;
   text-rendering: auto;
-  paint-order: stroke fill;
+  paint-order: fill;
 }
 
 .scratch-blocks-host .blocklyText,
 .scratch-blocks-host .blocklyText tspan {
-  fill: #fff !important;
-  stroke: #fff !important;
-  stroke-width: 0.25px !important;
+  fill: #122333 !important;
+  stroke: none !important;
+  stroke-width: 0 !important;
 }
 
 .scratch-blocks-host .blocklyEditableText > rect,
@@ -587,9 +586,9 @@ button {
 .scratch-blocks-host .blocklyNonEditableText text,
 .scratch-blocks-host .blocklyNonEditableText tspan,
 .scratch-blocks-host .blocklyFlyoutLabelText {
-  fill: #575e75 !important;
-  stroke: #575e75 !important;
-  stroke-width: 0.18px !important;
+  fill: #122333 !important;
+  stroke: none !important;
+  stroke-width: 0 !important;
 }
 
 .scratch-blocks-host .blocklyToolboxDiv {

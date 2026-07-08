@@ -272,10 +272,11 @@ function stabilizeBlocklySvg(host) {
     element.style.strokeOpacity = '1';
     element.style.filter = 'none';
     element.style.mixBlendMode = 'normal';
-    element.style.fill = '#FFFFFF';
-    element.style.stroke = '#FFFFFF';
-    element.style.strokeWidth = '0.25px';
-    element.style.paintOrder = 'stroke fill';
+    element.style.fill = '#122333';
+    element.style.stroke = 'none';
+    element.style.strokeWidth = '0';
+    element.style.fontWeight = '900';
+    element.style.paintOrder = 'fill';
   });
 
   host.querySelectorAll(
@@ -286,10 +287,11 @@ function stabilizeBlocklySvg(host) {
     element.style.strokeOpacity = '1';
     element.style.filter = 'none';
     element.style.mixBlendMode = 'normal';
-    element.style.fill = '#575E75';
-    element.style.stroke = '#575E75';
-    element.style.strokeWidth = '0.18px';
-    element.style.paintOrder = 'stroke fill';
+    element.style.fill = '#122333';
+    element.style.stroke = 'none';
+    element.style.strokeWidth = '0';
+    element.style.fontWeight = '900';
+    element.style.paintOrder = 'fill';
   });
 }
 
