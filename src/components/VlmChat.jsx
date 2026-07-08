@@ -153,7 +153,8 @@ export default function VlmChat({bridge, vlmClient, sdClient, captureFrame}) {
           />
           <button
             className="send-button"
-            type="submit"
+            type="button"
+            onClick={() => send()}
             disabled={isThinking || !text.trim()}
             aria-label="发送"
           >
