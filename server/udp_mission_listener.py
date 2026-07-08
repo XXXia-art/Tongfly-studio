@@ -15,6 +15,7 @@ def main():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((HOST, PORT))
     print(f"mission UDP listener on {HOST}:{PORT}", flush=True)
+    print("waiting for compiled mission JSON ...", flush=True)
 
     while True:
         data, addr = sock.recvfrom(1024 * 1024)
@@ -27,7 +28,13 @@ def main():
                 encoding="utf-8",
             )
             actions = len(mission.get("flightActions", []))
-            print(f"received mission {mission_id} from {addr}: {actions} actions -> {path}", flush=True)
+            print("\n" + "=" * 72, flush=True)
+            print(f"received mission {mission_id} from {addr}", flush=True)
+            print(f"actions: {actions}", flush=True)
+            print(f"saved: {path}", flush=True)
+            print("-" * 72, flush=True)
+            print(json.dumps(mission, ensure_ascii=False, indent=2), flush=True)
+            print("=" * 72, flush=True)
         except Exception as exc:
             print(f"failed to receive mission from {addr}: {exc}", flush=True)
 

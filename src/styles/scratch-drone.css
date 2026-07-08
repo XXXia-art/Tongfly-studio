@@ -580,14 +580,13 @@ button {
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: minmax(220px, 34%) minmax(190px, 26%) minmax(0, 1fr);
+  grid-template-rows: minmax(240px, 42%) minmax(0, 1fr);
   gap: 12px;
   padding: 12px;
 }
 
 .drone-stage,
-.vlm-chat,
-.compile-panel {
+.vlm-chat {
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
@@ -598,8 +597,7 @@ button {
 }
 
 .drone-stage header,
-.vlm-chat header,
-.compile-panel header {
+.vlm-chat header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -608,48 +606,14 @@ button {
 }
 
 .drone-stage h2,
-.vlm-chat h2,
-.compile-panel h2 {
+.vlm-chat h2 {
   margin: 0;
   font-size: 16px;
 }
 
-.drone-stage header span,
-.compile-panel header span {
+.drone-stage header span {
   color: #687782;
   font-size: 12px;
-}
-
-.compile-panel pre {
-  min-height: 0;
-  margin: 0;
-  padding: 12px 14px;
-  overflow: auto;
-  color: #1b2b36;
-  background: #f7fbff;
-  font: 12px/1.45 Consolas, "SFMono-Regular", monospace;
-  white-space: pre-wrap;
-}
-
-.compile-log {
-  min-height: 34px;
-  max-height: 70px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding: 8px 12px;
-  overflow: auto;
-  border-top: 1px solid var(--line);
-  background: #f5eddc;
-}
-
-.compile-log span {
-  overflow: hidden;
-  color: #687782;
-  font-size: 12px;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .drone-stage canvas {
