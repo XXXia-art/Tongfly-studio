@@ -1,4 +1,4 @@
-import React, {forwardRef, useEffect, useImperativeHandle, useRef} from 'react';
+import React, {forwardRef, useLayoutEffect, useImperativeHandle, useRef} from 'react';
 import * as ScratchBlocks from 'scratch-blocks';
 import {yoloTargets} from '../data/droneBlockCatalog.js';
 
@@ -135,7 +135,7 @@ const ScratchBlocksEditor = forwardRef(function ScratchBlocksEditor({services, o
     refreshModules: () => refreshToolbox(workspaceRef.current, hostRef.current, cleanupToolboxCategoriesRef)
   }), [services, onLog]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!hostRef.current) return undefined;
 
     ensureScratchMessages();
@@ -180,6 +180,7 @@ const ScratchBlocksEditor = forwardRef(function ScratchBlocksEditor({services, o
 
     workspaceRef.current = workspace;
     loadStarterWorkspace(workspace);
+    stabilizeBlocklySvg(hostRef.current);
     scheduleRenderFix();
     requestAnimationFrame(() => {
       ScratchBlocks.svgResize(workspace);
@@ -229,6 +230,22 @@ const ScratchBlocksEditor = forwardRef(function ScratchBlocksEditor({services, o
 
 function stabilizeBlocklySvg(host) {
   if (!host) return;
+
+  host.querySelectorAll(
+    '.blocklySvg, .blocklyWorkspace, .blocklyBlockCanvas, .blocklyFlyout, .blocklyFlyoutBackground, .blocklyToolboxDiv, .blocklyToolbox'
+  ).forEach(element => {
+    element.style.opacity = '1';
+    element.style.filter = 'none';
+    element.style.mixBlendMode = 'normal';
+  });
+
+  host.querySelectorAll(
+    '.blocklyToolboxCategory, .blocklyToolboxCategoryLabel, .blocklyTreeRowContentContainer'
+  ).forEach(element => {
+    element.style.opacity = '1';
+    element.style.filter = 'none';
+    element.style.mixBlendMode = 'normal';
+  });
 
   host.querySelectorAll(
     '.blocklyBlockCanvas .blocklyDraggable, .blocklyFlyout .blocklyDraggable'
