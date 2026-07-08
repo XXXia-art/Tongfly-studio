@@ -399,19 +399,37 @@ button {
 }
 
 .scratch-blocks-host .blocklySvg {
-  transform: translateZ(0);
-  backface-visibility: hidden;
+  transform: none;
+  backface-visibility: visible;
 }
 
 .scratch-blocks-host .blocklyBlockCanvas .blocklyDraggable,
 .scratch-blocks-host .blocklyFlyout .blocklyDraggable {
   opacity: 1 !important;
   filter: none !important;
+  mix-blend-mode: normal !important;
+}
+
+.scratch-blocks-host .blocklyBlockCanvas .blocklyDraggable *,
+.scratch-blocks-host .blocklyBlockCanvas .blocklyDraggable use,
+.scratch-blocks-host .blocklyBlockCanvas .blocklyDraggable image,
+.scratch-blocks-host .blocklyBlockCanvas .blocklyDisabled,
+.scratch-blocks-host .blocklyBlockCanvas .blocklyDisabled *,
+.scratch-blocks-host .blocklyBlockCanvas .blocklySelected,
+.scratch-blocks-host .blocklyBlockCanvas .blocklySelected * {
+  opacity: 1 !important;
+  filter: none !important;
+  mix-blend-mode: normal !important;
 }
 
 .scratch-blocks-host .blocklyPath,
 .scratch-blocks-host .blocklyPathLight,
-.scratch-blocks-host .blocklyPathDark {
+.scratch-blocks-host .blocklyPathDark,
+.scratch-blocks-host .blocklyPathOutline,
+.scratch-blocks-host .blocklyPathSelected,
+.scratch-blocks-host .blocklyEditableText > rect,
+.scratch-blocks-host .blocklyNonEditableText > rect,
+.scratch-blocks-host .blocklyFieldRect {
   fill-opacity: 1 !important;
   stroke-opacity: 1 !important;
 }
@@ -419,9 +437,15 @@ button {
 .scratch-blocks-host .blocklyText,
 .scratch-blocks-host .blocklyEditableText text,
 .scratch-blocks-host .blocklyNonEditableText text,
-.scratch-blocks-host .blocklyFlyoutLabelText {
+.scratch-blocks-host .blocklyFlyoutLabelText,
+.scratch-blocks-host .blocklyText tspan,
+.scratch-blocks-host .blocklyEditableText tspan,
+.scratch-blocks-host .blocklyNonEditableText tspan {
   opacity: 1 !important;
   fill-opacity: 1 !important;
+  stroke-opacity: 1 !important;
+  filter: none !important;
+  mix-blend-mode: normal !important;
   text-rendering: geometricPrecision;
 }
 
