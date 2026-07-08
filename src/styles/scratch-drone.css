@@ -25,8 +25,8 @@ body {
   font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
   background: var(--paper);
   overflow: hidden;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: subpixel-antialiased;
+  text-rendering: auto;
 }
 
 button,
@@ -37,6 +37,14 @@ input {
 button {
   border: 0;
   cursor: pointer;
+}
+
+.scratch-app,
+.scratch-app button,
+.scratch-app input {
+  opacity: 1;
+  -webkit-text-fill-color: currentColor;
+  text-shadow: 0 0 0 currentColor;
 }
 
 .scratch-app {
@@ -556,12 +564,16 @@ button {
   stroke-opacity: 1 !important;
   filter: none !important;
   mix-blend-mode: normal !important;
-  text-rendering: geometricPrecision;
+  font-weight: 700 !important;
+  text-rendering: auto;
+  paint-order: stroke fill;
 }
 
 .scratch-blocks-host .blocklyText,
 .scratch-blocks-host .blocklyText tspan {
   fill: #fff !important;
+  stroke: #fff !important;
+  stroke-width: 0.25px !important;
 }
 
 .scratch-blocks-host .blocklyEditableText > rect,
@@ -576,6 +588,8 @@ button {
 .scratch-blocks-host .blocklyNonEditableText tspan,
 .scratch-blocks-host .blocklyFlyoutLabelText {
   fill: #575e75 !important;
+  stroke: #575e75 !important;
+  stroke-width: 0.18px !important;
 }
 
 .scratch-blocks-host .blocklyToolboxDiv {

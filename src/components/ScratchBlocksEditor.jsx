@@ -273,6 +273,9 @@ function stabilizeBlocklySvg(host) {
     element.style.filter = 'none';
     element.style.mixBlendMode = 'normal';
     element.style.fill = '#FFFFFF';
+    element.style.stroke = '#FFFFFF';
+    element.style.strokeWidth = '0.25px';
+    element.style.paintOrder = 'stroke fill';
   });
 
   host.querySelectorAll(
@@ -284,6 +287,9 @@ function stabilizeBlocklySvg(host) {
     element.style.filter = 'none';
     element.style.mixBlendMode = 'normal';
     element.style.fill = '#575E75';
+    element.style.stroke = '#575E75';
+    element.style.strokeWidth = '0.18px';
+    element.style.paintOrder = 'stroke fill';
   });
 }
 
