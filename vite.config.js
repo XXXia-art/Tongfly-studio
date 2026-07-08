@@ -80,15 +80,22 @@ function isPathInsideRoot(filePath) {
 }
 
 function normalizeOutputMessage(message) {
-  const imagePath = message?.payload?.image_path;
+  const imagePath = message?.image_path || message?.payload?.image_path;
   if (!imagePath || !isPathInsideRoot(imagePath)) {
     return message;
+  }
+  const imageUrl = `/bridge/output-image?path=${encodeURIComponent(path.resolve(imagePath))}`;
+  if (message?.image_path) {
+    return {
+      ...message,
+      image_url: imageUrl
+    };
   }
   return {
     ...message,
     payload: {
       ...message.payload,
-      image_url: `/bridge/output-image?path=${encodeURIComponent(path.resolve(imagePath))}`
+      image_url: imageUrl
     }
   };
 }

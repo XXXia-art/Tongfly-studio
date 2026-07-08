@@ -8,6 +8,7 @@ const createMessageId = () => {
 };
 
 const outputSkillLabel = message => {
+  if (message.type === 'sd_result') return '创意喷绘';
   if (message.type === 'vlm_vision_result') return '查看画面';
   if (message.type === 'vlm_chat_result') return '普通对话';
   return message.describe || '模型回复';
@@ -48,7 +49,8 @@ export default function VlmChat({
         id: `output-${message.id}`,
         role: 'assistant',
         skill: outputSkillLabel(message),
-        text: outputText(message)
+        text: outputText(message),
+        image: outputImage(message)
       }))
     ]);
     setIsThinking(false);
@@ -279,9 +281,22 @@ export default function VlmChat({
 }
 
 function outputText(message) {
+  if (message.type === 'sd_result') {
+    return [
+      message.asr_text ? `普通话识别：${message.asr_text}` : '',
+      message.prompt_en ? `英文提示词：${message.prompt_en}` : ''
+    ].filter(Boolean).join('\n') || message.text || '已收到 SD 图片结果';
+  }
   const text = message.text || message.answer || JSON.stringify(message);
   if (message.type === 'vlm_vision_result' && message.image_path) {
     return `${text}\n图片路径：${message.image_path}`;
   }
   return text;
+}
+
+function outputImage(message) {
+  if (message.type === 'vlm_vision_result') {
+    return message.image_url || message.image || null;
+  }
+  return null;
 }

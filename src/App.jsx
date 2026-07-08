@@ -47,6 +47,7 @@ export default function App() {
         for (const message of result.messages || []) {
           if (message.type === 'sd_result') {
             setSdOutput(message);
+            setVlmOutputs(current => [...current.slice(-20), message]);
           } else if (vlmOutputTypes.has(message.type)) {
             setVlmOutputs(current => [...current.slice(-20), message]);
           }

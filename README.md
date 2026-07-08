@@ -218,9 +218,9 @@ npm run dev -- --host 0.0.0.0
 
 | type | 前端显示位置 |
 | --- | --- |
-| `sd_result` | 右上角 SD 图片显示区 |
+| `sd_result` | `asr_text` 和 `prompt_en` 显示在右下角聊天区，`image_path` 对应图片显示在右上角 SD 图片显示区 |
 | `vlm_chat_result` | 右下角聊天区，普通 VLM 对话回复 |
-| `vlm_vision_result` | 右下角聊天区，查看画面/图像理解回复 |
+| `vlm_vision_result` | `text` 和 `image_path` 对应图片都显示在右下角聊天区 |
 
 SD 图片返回推荐格式：
 
@@ -271,9 +271,9 @@ VLM 普通文本对话返回：
   mode=7 -> 读取 text，执行普通 VLM 对话
 
 返回 9300:
-  type=sd_result -> 前端显示图片
+  type=sd_result -> 前端在聊天区显示 asr_text/prompt_en，在右上角显示 image_path 对应图片
   type=vlm_chat_result -> 前端显示 VLM 普通对话回复
-  type=vlm_vision_result -> 前端显示查看画面回复
+  type=vlm_vision_result -> 前端在聊天区显示 text 和 image_path 对应图片
 ```
 
 旧的 FastAPI 后端、VLM/SD 模型调用代码已经归档到：
