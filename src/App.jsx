@@ -6,8 +6,11 @@ import DroneStage from './components/DroneStage.jsx';
 import VlmChat from './components/VlmChat.jsx';
 import ScratchBlocksEditor from './components/ScratchBlocksEditor.jsx';
 
+const modeButtons = ['编程积木', '语音控制', '创意喷绘', '手势控制'];
+
 export default function App() {
   const [moduleName, setModuleName] = useState('阶梯式飞行');
+  const [activeMode, setActiveMode] = useState(modeButtons[0]);
   const blocksEditorRef = useRef(null);
   const droneStageRef = useRef(null);
   const services = useMemo(() => ({droneBridge, vlmClient, sdClient}), []);
@@ -45,9 +48,18 @@ export default function App() {
             <span>Scratch GUI 迁移版</span>
           </div>
         </div>
-        <div className="status-pill">图传模拟中</div>
-        <div className="status-pill">VLM 待命</div>
-        <div className="status-pill">SD 待命</div>
+        <nav className="mode-switcher" aria-label="功能模式">
+          {modeButtons.map(mode => (
+            <button
+              className={`mode-button ${activeMode === mode ? 'active' : ''}`}
+              key={mode}
+              type="button"
+              onClick={() => setActiveMode(mode)}
+            >
+              {mode}
+            </button>
+          ))}
+        </nav>
         <button className="run-button" onClick={runPreview}>运行</button>
       </header>
 

@@ -87,8 +87,41 @@ button {
   font-size: 12px;
 }
 
+.mode-switcher {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.mode-button {
+  height: 38px;
+  min-width: 108px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: #1f2c36;
+  background: #fff8e8;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 1px 0 rgba(34, 49, 63, 0.06);
+}
+
+.mode-button:hover {
+  border-color: #bfc9b7;
+  background: #fffdf7;
+}
+
+.mode-button.active {
+  color: #fff;
+  border-color: #0f8c73;
+  background: #0f8c73;
+}
+
 .run-button {
-  margin-left: auto;
   height: 38px;
   padding: 0 18px;
   border-radius: 8px;
