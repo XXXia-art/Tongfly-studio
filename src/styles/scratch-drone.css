@@ -1,12 +1,12 @@
 :root {
-  --scratch-blue: #2f7ee8;
-  --scratch-blue-shadow: #1857a7;
-  --scratch-control: #f08b20;
-  --scratch-control-shadow: #b65f13;
+  --scratch-blue: #4C97FF;
+  --scratch-blue-shadow: #3373CC;
+  --scratch-control: #FFAB19;
+  --scratch-control-shadow: #CF8B17;
   --paper: #f7f3e8;
   --panel: #fffaf0;
-  --line: #8f8677;
-  --ink: #07131e;
+  --line: #d9d2bd;
+  --ink: #22313f;
 }
 
 * {
@@ -22,12 +22,11 @@ body,
 body {
   margin: 0;
   color: var(--ink);
-  font-family: "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
   background: var(--paper);
   overflow: hidden;
   -webkit-font-smoothing: subpixel-antialiased;
   text-rendering: auto;
-  font-weight: 700;
 }
 
 button,
@@ -51,8 +50,6 @@ button {
   height: 100%;
   display: grid;
   grid-template-rows: 58px minmax(0, 1fr);
-  color: var(--ink);
-  background: var(--paper);
 }
 
 .scratch-topbar {
@@ -61,7 +58,7 @@ button {
   gap: 12px;
   padding: 0 16px;
   background: #fffdf7;
-  border-bottom: 2px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
 
 .brand {
@@ -87,14 +84,14 @@ button {
 }
 
 .brand span {
-  color: #172635;
+  color: #40515f;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .status-pill {
   padding: 7px 10px;
-  border: 2px solid var(--line);
+  border: 1px solid var(--line);
   border-radius: 999px;
   background: #fff8e8;
   font-size: 12px;
@@ -114,14 +111,14 @@ button {
   height: 34px;
   min-width: 104px;
   padding: 0 15px;
-  border: 2px solid #8f8677;
+  border: 1px solid #d9cfb6;
   border-radius: 10px;
-  color: #07131e;
+  color: #253542;
   background: linear-gradient(180deg, #fffdf8 0%, #f8f0df 100%);
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 800;
   white-space: nowrap;
-  box-shadow: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78), 0 1px 2px rgba(34, 49, 63, 0.08);
 }
 
 .mode-button:hover {
@@ -132,9 +129,9 @@ button {
 
 .mode-button.active {
   color: #fff;
-  border-color: #064d40;
-  background: #096d5a;
-  box-shadow: none;
+  border-color: #0f8c73;
+  background: linear-gradient(180deg, #299b84 0%, #0f7f68 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 4px 10px rgba(15, 140, 115, 0.22);
 }
 
 .flight-control-actions {
@@ -147,14 +144,14 @@ button {
 .flight-control-button {
   height: 38px;
   padding: 0 15px;
-  border: 2px solid #467e6d;
+  border: 1px solid #8fb9aa;
   border-radius: 8px;
-  color: #07131e;
+  color: #0d5f50;
   background: linear-gradient(180deg, #f6fffb 0%, #d9eee7 100%);
   font-size: 13px;
   font-weight: 900;
   white-space: nowrap;
-  box-shadow: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 2px 6px rgba(13, 95, 80, 0.12);
 }
 
 .flight-control-button:hover {
@@ -168,21 +165,21 @@ button {
   padding: 0 18px;
   border-radius: 8px;
   color: #fff;
-  background: #096d5a;
-  font-weight: 900;
+  background: #0f8c73;
+  font-weight: 800;
 }
 
 .reset-control-button {
   height: 38px;
   padding: 0 16px;
-  border: 2px solid #9c6a1f;
+  border: 1px solid #c89f59;
   border-radius: 8px;
   color: #6b3e12;
   background: linear-gradient(180deg, #fff6df 0%, #f1cf8a 100%);
   font-size: 13px;
   font-weight: 900;
   white-space: nowrap;
-  box-shadow: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.68), 0 2px 6px rgba(107, 62, 18, 0.13);
 }
 
 .reset-control-button:hover {
@@ -203,7 +200,7 @@ button {
   display: grid;
   align-content: start;
   gap: 8px;
-  background: #172635;
+  background: #243744;
 }
 
 .category {
@@ -213,9 +210,8 @@ button {
   gap: 3px;
   padding: 7px 4px;
   border-radius: 8px;
-  color: #fff;
-  background: #263c4d;
-  font-weight: 900;
+  color: #f5f8fb;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .category.active {
@@ -227,7 +223,7 @@ button {
   min-height: 0;
   padding: 14px;
   background: #f5eddc;
-  border-right: 2px solid var(--line);
+  border-right: 1px solid var(--line);
   overflow: auto;
 }
 
@@ -244,9 +240,9 @@ button {
 
 .palette-heading span,
 .palette-note {
-  color: #07131e;
+  color: #40515f;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .palette-note {
@@ -420,7 +416,7 @@ button {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   background: #fffaf0;
-  border-right: 2px solid var(--line);
+  border-right: 1px solid var(--line);
 }
 
 .scratch-blocks-stage {
@@ -433,8 +429,7 @@ button {
   gap: 10px;
   align-items: center;
   padding: 16px;
-  border-bottom: 2px solid var(--line);
-  background: #fffdf7;
+  border-bottom: 1px solid var(--line);
 }
 
 .module-toolbar-group {
@@ -447,11 +442,9 @@ button {
   width: 240px;
   height: 38px;
   padding: 0 10px;
-  border: 2px solid var(--line);
+  border: 1px solid var(--line);
   border-radius: 8px;
   background: #fffdf7;
-  color: #07131e;
-  font-weight: 900;
 }
 
 .editor-toolbar button {
@@ -507,7 +500,6 @@ button {
 
 .scratch-blocks-host .blocklyMainBackground {
   stroke: none;
-  fill: #f9f9f9 !important;
 }
 
 .scratch-blocks-host .blocklySvg {
@@ -586,9 +578,7 @@ button {
 .scratch-blocks-host .blocklyEditableText > rect,
 .scratch-blocks-host .blocklyNonEditableText > rect,
 .scratch-blocks-host .blocklyFieldRect {
-  fill: #f1eadb !important;
-  stroke: #6e6659 !important;
-  stroke-width: 1.2px !important;
+  fill: #fff !important;
 }
 
 .scratch-blocks-host .blocklyEditableText text,
@@ -602,15 +592,15 @@ button {
 }
 
 .scratch-blocks-host .blocklyToolboxDiv {
-  border-right: 2px solid #6e6659;
+  border-right: 1px solid #ddd;
 }
 
 .scratch-blocks-host .blocklyToolbox {
   width: 82px !important;
   padding: 6px !important;
   border-right: 0 !important;
-  background: #172635 !important;
-  box-shadow: none;
+  background: #243744 !important;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.07);
 }
 
 .scratch-blocks-host .blocklyToolboxCategoryGroup {
@@ -778,22 +768,19 @@ button {
   align-items: baseline;
   justify-content: space-between;
   padding: 12px 14px;
-  border-bottom: 2px solid var(--line);
-  background: #fffdf7;
+  border-bottom: 1px solid var(--line);
 }
 
 .drone-stage h2,
 .vlm-chat h2 {
   margin: 0;
   font-size: 16px;
-  color: #07131e;
-  font-weight: 900;
 }
 
 .drone-stage header span {
-  color: #07131e;
+  color: #40515f;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .sd-preview {
@@ -843,18 +830,15 @@ button {
   flex-direction: column;
   gap: 10px;
   overflow: auto;
-  background: #fffdf7;
 }
 
 .message {
   max-width: 82%;
   padding: 10px 12px;
   border-radius: 8px;
-  border: 2px solid #9b9282;
+  border: 1px solid var(--line);
   background: #fff;
-  color: #07131e;
   font-size: 13px;
-  font-weight: 900;
   line-height: 1.5;
   white-space: pre-wrap;
 }
@@ -931,7 +915,7 @@ button {
 
 .chat-form {
   padding: 12px;
-  border-top: 2px solid var(--line);
+  border-top: 1px solid var(--line);
   background: #f5eddc;
 }
 
@@ -949,10 +933,10 @@ button {
   align-items: center;
   gap: 8px;
   padding: 6px;
-  border: 2px solid var(--line);
+  border: 1px solid var(--line);
   border-radius: 999px;
   background: #fffdf7;
-  box-shadow: none;
+  box-shadow: 0 2px 8px rgba(34, 49, 63, 0.08);
 }
 
 .chat-composer input {
@@ -1003,7 +987,7 @@ button {
   display: grid;
   gap: 4px;
   padding: 6px;
-  border: 2px solid var(--line);
+  border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
   box-shadow: 0 8px 20px rgba(34, 49, 63, 0.16);
