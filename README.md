@@ -75,13 +75,25 @@ python -m drone_gesture.app
 见 [`gesture-aircraft/README.md`](gesture-aircraft/README.md)。
 
 ---
+## 模型存放地址
+
+| 名称 | 地址 |
+| --- | --- | 
+| `SD-1.5` | `https://huggingface.co/happyme531/Stable-Diffusion-1.5-LCM-ONNX-RKNN2` |
+| `Qwen2-VL` | `https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct` | 
+| `Whisper` | `自传模型还未放置HuggingFace` |
+| `Mediapipe
+
+
+
+` | `自传模型还未放置HuggingFace` | 
 
 ## 远程仓库
 
 | 名称 | 地址 | 用途 |
 | --- | --- | --- |
 | `origin` | `https://github.com/XXXia-art/Tongfly-studio` | 主开发仓库（GitHub） |
-| `upstream` | `https://gitee.com/marquerze/Tongfly` | 上游镜像（Gitee） |
+| `upstream` | `https://gitee.com/marquerze/Tongfly` | Tongfly软件端镜像（Gitee） |
 
 日常开发向 `origin` 推送；从 `upstream` 拉取上游更新。
 
